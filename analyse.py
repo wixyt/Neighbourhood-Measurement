@@ -2,10 +2,11 @@
 import sys
 import argparse
 import networkx as nx
-from networkx.readwrite import json_graph
 import numpy as np
+from scipy.optimize import minimize
 import json
 import os
+from networkx.readwrite import json_graph
 from load import wrapper
 
 
@@ -30,7 +31,7 @@ def hadamard_product(a, b):
     # practically an XOR on arrays with units of 0 and 1
     return np.multiply(a, b)
 
-def internal_consistency(graph):
+def internal_consistency(graph, w_i=None):
     node_list = graph.nodes()
     internal_consistency = 0.0
     adj_m = adjancency_array(graph, node_list)
@@ -52,6 +53,8 @@ def internal_consistency(graph):
             x_i = np.array(graph.node[node_list[i]]['attributes'])
             x_j = np.array(graph.node[node_list[j]]['attributes'])
             elewise_product = hadamard_product(x_i, x_j)
+            if w_i is not None:
+                elewise_product = np.multiply(elewise_product, w_i)
             total = np.multiply(elewise_product, suprise_index)
             
             internal_consistency += np.sum(total)
@@ -68,7 +71,7 @@ def boundary_edges(G):
 def unsuprising_metric(k_i, k_b, edges):
     return (1 - min(1, (k_i*k_b)/(2.0*edges)))
 
-def external_separability(G, E):
+def external_separability(G, E, w_e=None):
     external_separability = 0.0 
     # ideally it should be low for high quality neighbourhood
 
@@ -87,8 +90,9 @@ def external_separability(G, E):
             unsup_metric = unsuprising_metric(G.degree(edge[1]), G.degree(edge[0]), len(G.edges()))
             x_i = np.array(G.node[edge[1]]['attributes'])
             x_b = np.array(G.node[edge[0]]['attributes'])
-        
         elewise_product = hadamard_product(x_i, x_b)
+        if w_e is not None:
+            elewise_product = np.multiply(elewise_product, w_e)
         total = np.multiply(elewise_product, unsup_metric)
         
         external_separability += np.sum(total)
@@ -151,6 +155,31 @@ def calculate_normality(C, graph):
     # Calculat Normality
     N = I - E
     print("Normality: %f" % N)
+    print("Optizmize the function...")
+    objective_optimization(graph, C)
+    return N
+
+def calculate_imin(C, adj_m):
+    node_list = C.nodes()
+    minimum = 0.0
+    for i in range(len(adj_m.toarray())):
+        for j in range(len(adj_m.toarray())):
+            minimum += -(C.degree(node_list[i])*C.degree(node_list[i]))/(2.0*len(C.edges()))
+    return minimum
+
+def optimize(x_i, x_e, C, G):
+    # TODO: make this parameters more efficient
+    return internal_consistency(C, x_i) - external_separability(G, boundary_edges(graph), x_e)
+
+def objective_optimization(graph, C):
+    adj_m = nx.adjacency_matrix(C)
+    length = len(graph.node[0]['attributes'])
+    I_max = float(len(adj_m.toarray())**2)
+    I_min = calculate_imin(C, adj_m)
+    x_i = np.ones(length)
+    x_e = np.ones(length)
+    # res = minimize(optimize, method='BFGS', jac=None, args=(x_i, x_e, C, graph), bounds=(I_min, I_max))
+    # print res.x
     
 def operations(graph):
     I = cluster_and_subgraph(graph)
@@ -187,12 +216,13 @@ def main(args):
             graph = wrapper(args[2], "directed")
         else:
             graph = wrapper(args[2])
-        operations(graph)
+    
     
         
     else:
         print("No valid arguments given")
 
+    operations(graph)
     
 if __name__ == "__main__":
     main(sys.argv)
