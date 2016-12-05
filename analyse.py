@@ -164,8 +164,13 @@ def main(args):
     # -c Create graph from data files (edges, features, etc) 
     # --directed 
 
-    if len(args) < 3:
-        print("invalid argumanfoi oa EXITING")
+    if len(args) < 4:
+        print("""Invalid arguments EXITING \n ARGUMENTS 
+    # -[l|c] data_directory {--directed} {--pickle|--json}
+    # -l load from graph file like JSON or PICKLE
+    # -c Create graph from data files (edges, features, etc) 
+    # --directed """
+    )
         sys.exit()
     _dir = os.path.dirname(os.path.realpath(__file__))
 

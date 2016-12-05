@@ -23,7 +23,7 @@ def edge_list_from_file(path, delim="\t"):
     for element in d:
         try:
             if skip.search(element[0]):
-                print("Caught crap: ", element[0])
+                print("Caught bad element: ", element[0])
                 continue
             # pair = element[0].split(' ')
             # edges.append((int(pair[0]), int(pair[1])))
