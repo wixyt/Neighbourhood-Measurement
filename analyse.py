@@ -3,7 +3,8 @@ import sys
 import argparse
 import networkx as nx
 import numpy as np
-from scipy.optimize import minimize
+import matplotlib.pyplot as plt
+import scipy as sp
 import json
 import os
 from networkx.readwrite import json_graph
@@ -167,19 +168,35 @@ def calculate_imin(C, adj_m):
             minimum += -(C.degree(node_list[i])*C.degree(node_list[i]))/(2.0*len(C.edges()))
     return minimum
 
-def optimize(x_i, x_e, C, G):
+def optimize(x_i, C, G, i_max): # taking out one weight vector for simplisiticity
     # TODO: make this parameters more efficient
-    return internal_consistency(C, x_i) - external_separability(G, boundary_edges(graph), x_e)
+    # x_i, x_i = weight_vectors
+    return i_max-(internal_consistency(C, x_i) - external_separability(G, boundary_edges(G), x_i))
 
 def objective_optimization(graph, C):
     adj_m = nx.adjacency_matrix(C)
-    length = len(graph.node[0]['attributes'])
+    length = sum([len(graph.node[x]['attributes']) for x in graph.nodes()])/len(graph.nodes())
+    print length
     I_max = float(len(adj_m.toarray())**2)
     I_min = calculate_imin(C, adj_m)
     x_i = np.ones(length)
     x_e = np.ones(length)
-    # res = minimize(optimize, method='BFGS', jac=None, args=(x_i, x_e, C, graph), bounds=(I_min, I_max))
-    # print res.x
+    # weight vector components are normalised between 0 and 1
+    bnds = tuple((0, 1) for x in x_i)
+    
+    
+    # res = sp.optimize.minimize(fun=optimize, method='BFGS', jac=True, args=(x_i, C, graph), options={"maxiter": 5000}, bounds=bounds)
+    res = sp.optimize.minimize(
+        optimize, # function 
+        x_i, # weight vector 
+        args=(C, graph, I_max, ), # other parameters to be passed in as arguments to the function
+        method='L-BFGS-B',
+        bounds=bnds, # bounds of the weight vector
+        options={"maxiter": 20}
+        )
+    print "weight vector after optimisation: %s" % res.x
+    print "results after optimisation of weight vector==="
+    print "Normality: %f" % (optimize(res.x, C, graph, I_max))
     
 def operations(graph):
     I = cluster_and_subgraph(graph)
