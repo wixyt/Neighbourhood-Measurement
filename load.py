@@ -7,6 +7,8 @@ import os, os.path
 import matplotlib.pyplot as plt
 import glob
 import math
+import operator
+from sklearn.feature_extraction import DictVectorizer
 from networkx.readwrite import json_graph
 import json
 
@@ -106,6 +108,25 @@ def load_node_features(node_feat_file, feature_index, G, node_id):
         apply_attribute_vector(node_feat_vect, node_id, G, feature_index)
         apply_attributes(node_feat_vect, node_id, G, feature_index)
 
+def named_attributes_to_vector(G):
+    
+    # extract all named node features into a dictionary containing all known features of the graph 
+    # for each node produce a vector that is consistent with the size of the large feature dictionary
+    # note: this will result in very large attribute vectors - but feature selection will reduce the size
+    total = {}
+    for node in G.nodes():
+        for element in G.node[node]['named_attributes']:
+            if element not in total:
+                total[element] = 1
+    sorted_dict = sorted(total.items(), key=operator.itemgetter(0))
+    
+    v = DictVectorizer(sparse=False)
+    for node in G.nodes():
+        
+        X = v.fit_transform([total, G.node[node]['named_attributes']])
+        G.node[node]['full_featvector'] = X[1].tolist() # numpy arrays cannot be stored properly
+        
+
 def save(path, graph):
 
     save_file = json_graph.node_link_data(graph)
@@ -177,7 +198,8 @@ def wrapper(path, G_type='uni'):
         load_node_features(node_feat_file, attribute_dict, graph, node)
         load_nodes(edge_feat_file, attribute_dict, graph)
         load_edges(edge_file, graph)
-    #draw_nx_graph(graph)
+        named_attributes_to_vector(graph)
+    
     return graph
 
 if __name__ == "__main__":

@@ -32,6 +32,7 @@ def hadamard_product(a, b):
     # practically an XOR on arrays with units of 0 and 1
     return np.multiply(a, b)
 
+
 def internal_consistency(graph, w_i=None):
     node_list = graph.nodes()
     internal_consistency = 0.0
@@ -51,8 +52,8 @@ def internal_consistency(graph, w_i=None):
             )
 
             # element-wise product of attribute vectors
-            x_i = np.array(graph.node[node_list[i]]['attributes'])
-            x_j = np.array(graph.node[node_list[j]]['attributes'])
+            x_i = np.array(graph.node[node_list[i]]['full_featvector'])
+            x_j = np.array(graph.node[node_list[j]]['full_featvector'])
             elewise_product = hadamard_product(x_i, x_j)
             if w_i is not None:
                 elewise_product = np.multiply(elewise_product, w_i)
@@ -77,20 +78,13 @@ def external_separability(G, E, w_e=None):
     # ideally it should be low for high quality neighbourhood
 
     for edge in E:
-        # AWKWARD way of ensuring the interior node's degree is the first parameter
-        # TODO: make it not so awkward
-        if G.node[edge[0]]['subgraph'] == 'C':
-            unsup_metric = unsuprising_metric(
-                G.degree(edge[0]), 
-                G.degree(edge[1]), 
-                len(G.edges())
-            )
-            x_i = np.array(G.node[edge[0]]['attributes'])
-            x_b = np.array(G.node[edge[1]]['attributes'])
-        else:
-            unsup_metric = unsuprising_metric(G.degree(edge[1]), G.degree(edge[0]), len(G.edges()))
-            x_i = np.array(G.node[edge[1]]['attributes'])
-            x_b = np.array(G.node[edge[0]]['attributes'])
+        unsup_metric = unsuprising_metric(
+            G.degree(edge[0]), 
+            G.degree(edge[1]), 
+            len(G.edges())
+        )
+        x_i = np.array(G.node[edge[0]]['full_featvector'])
+        x_b = np.array(G.node[edge[1]]['full_featvector'])
         elewise_product = hadamard_product(x_i, x_b)
         if w_e is not None:
             elewise_product = np.multiply(elewise_product, w_e)
@@ -175,8 +169,7 @@ def optimize(x_i, C, G, i_max): # taking out one weight vector for simplisiticit
 
 def objective_optimization(graph, C):
     adj_m = nx.adjacency_matrix(C)
-    length = sum([len(graph.node[x]['attributes']) for x in graph.nodes()])/len(graph.nodes())
-    print length
+    length = sum([len(graph.node[x]['full_featvector']) for x in graph.nodes()])/len(graph.nodes())
     I_max = float(len(adj_m.toarray())**2)
     I_min = calculate_imin(C, adj_m)
     x_i = np.ones(length)
@@ -186,17 +179,17 @@ def objective_optimization(graph, C):
     
     
     # res = sp.optimize.minimize(fun=optimize, method='BFGS', jac=True, args=(x_i, C, graph), options={"maxiter": 5000}, bounds=bounds)
-    res = sp.optimize.minimize(
-        optimize, # function 
-        x_i, # weight vector 
-        args=(C, graph, I_max, ), # other parameters to be passed in as arguments to the function
-        method='L-BFGS-B',
-        bounds=bnds, # bounds of the weight vector
-        options={"maxiter": 20}
-        )
-    print "weight vector after optimisation: %s" % res.x
-    print "results after optimisation of weight vector==="
-    print "Normality: %f" % (optimize(res.x, C, graph, I_max))
+    # res = sp.optimize.minimize(
+    #     optimize, # function 
+    #     x_i, # weight vector 
+    #     args=(C, graph, I_max, ), # other parameters to be passed in as arguments to the function
+    #     method='L-BFGS-B',
+    #     bounds=bnds, # bounds of the weight vector
+    #     options={"maxiter": 20}
+    #     )
+    # print "weight vector after optimisation: %s" % res.x
+    # print "results after optimisation of weight vector==="
+    # print "Normality: %f" % (optimize(res.x, C, graph, I_max))
     
 def operations(graph):
     I = cluster_and_subgraph(graph)
