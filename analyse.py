@@ -231,7 +231,7 @@ def main(args):
         
     else:
         print("No valid arguments given")
-
+    print "Graph size: %d" % graph.size()
     operations(graph)
     
 if __name__ == "__main__":
