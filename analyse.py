@@ -52,8 +52,8 @@ def internal_consistency(graph, w_i=None):
             )
 
             # element-wise product of attribute vectors
-            x_i = np.array(graph.node[node_list[i]]['full_featvector'])
-            x_j = np.array(graph.node[node_list[j]]['full_featvector'])
+            x_i = np.array(graph.node[node_list[i]]['feature_vector'])
+            x_j = np.array(graph.node[node_list[j]]['feature_vector'])
             elewise_product = hadamard_product(x_i, x_j)
             if w_i is not None:
                 elewise_product = np.multiply(elewise_product, w_i)
@@ -83,8 +83,8 @@ def external_separability(G, E, w_e=None):
             G.degree(edge[1]), 
             len(G.edges())
         )
-        x_i = np.array(G.node[edge[0]]['full_featvector'])
-        x_b = np.array(G.node[edge[1]]['full_featvector'])
+        x_i = np.array(G.node[edge[0]]['feature_vector'])
+        x_b = np.array(G.node[edge[1]]['feature_vector'])
         elewise_product = hadamard_product(x_i, x_b)
         if w_e is not None:
             elewise_product = np.multiply(elewise_product, w_e)
@@ -169,7 +169,7 @@ def optimize(x_i, C, G, i_max): # taking out one weight vector for simplisiticit
 
 def objective_optimization(graph, C):
     adj_m = nx.adjacency_matrix(C)
-    length = sum([len(graph.node[x]['full_featvector']) for x in graph.nodes()])/len(graph.nodes())
+    length = sum([len(graph.node[x]['feature_vector']) for x in graph.nodes()])/len(graph.nodes())
     I_max = float(len(adj_m.toarray())**2)
     I_min = calculate_imin(C, adj_m)
     x_i = np.ones(length)

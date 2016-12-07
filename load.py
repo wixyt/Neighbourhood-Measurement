@@ -124,8 +124,8 @@ def named_attributes_to_vector(G):
     for node in G.nodes():
         
         X = v.fit_transform([total, G.node[node]['named_attributes']])
-        nx.set_node_attributes(G, 'full_featvector', {node: X[1].tolist()})
-        # G.node[node]['full_featvector'] = X[1].tolist() # numpy arrays cannot be stored properly
+        # nx.set_node_attributes(G, 'full_featvector', {node: X[1].tolist()})
+        G.node[node]['feature_vector'] = X[1].tolist() # numpy arrays cannot be stored properly
         
 def save_as_pickle(path, graph):
     # TODO: does not save feature vector attributes properly
@@ -164,6 +164,7 @@ def main(args):
             load_nodes(edge_feat_file, attribute_dict, graph)
             
             load_edges(edge_file, graph)
+        named_attributes_to_vector(graph)
         save(os.path.join(data_dir + "/" + args[3] + '.json'), graph)
         # save_as_pickle(os.path.join(data_dir + "/" + args[3]), graph)
 
