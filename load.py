@@ -13,7 +13,148 @@ from networkx.readwrite import json_graph
 import json
 
 
-_dir = os.path.dirname(os.path.realpath(__file__))
+class GraphLoader(object):
+    def __init__(self, args):
+        self.directed = args[1]
+        # TODO: add elif for multigraphs
+        if self.directed:
+            print ("Returning Directed Graph...")
+            self.graph = nx.DiGraph()
+        else:
+            print ("Returning Undirected Graph...")
+            self.graph = nx.Graph()
+        self.path = os.path.join(os.path.dirname(os.path.realpath(__file__)) + "/" + args[0])
+        self.file_nodes = [int(x.split("/")[-1].split('.')[0]) for x in glob.iglob(self.path + "/*.featnames")]
+
+    
+    def save(self, path):
+        save_file = json_graph.node_link_data(self.graph)
+        json.dump(save_file, open(path, 'w'), indent=2)
+
+    def load_files(self):
+        subgraph_count = 0 # value to keep track on total number of subgraphs
+        for node in self.file_nodes: 
+            # get file paths
+            feature_name_file = os.path.join(self.path + "/%s.featnames" % node)
+            edge_file = os.path.join(self.path + "/%s.edges" % node)
+            edge_feat_file = os.path.join(self.path + "/%s.feat" % node)
+            node_feat_file = os.path.join(self.path + "/%s.egofeat" % node)
+            circles_file = os.path.join(self.path + "/%s.circles" % node)
+            
+            # load nodes/attributes onto graph
+            
+            self.graph.add_node(node)
+            attribute_dict = self.load_attributes(feature_name_file)
+
+            self.load_node_features(node_feat_file, attribute_dict, node)
+            self.load_nodes(edge_feat_file, attribute_dict)
+            self.load_edges(edge_file)
+            self.add_empty_subgraph()
+            subgraph_count += self.apply_ground_truths(circles_file, subgraph_count)
+        self.named_attributes_to_vector()
+
+    def load_attributes(self, feature_file_path):
+        # create dictionary of features keys and values
+        feature_index = {}
+        try: 
+            feature_file_contents = open(feature_file_path)
+        except IOError:
+            print("Could not open feature file.")
+            return False
+        for line in feature_file_contents:
+            feature = line.split(' ')
+            feature_index[feature[0]] = feature[-1][:-1]
+
+        return feature_index
+
+
+    def load_node_features(self, node_feat_file, feature_index, node_id):
+        key_array = feature_index.keys()
+        with open(node_feat_file, 'r') as file:
+            vector_string = file.read()[:-1]
+            node_feat_vect = [int(x) for x in vector_string.split(' ')]
+            self.apply_attribute_vector(node_feat_vect, node_id, feature_index)
+            self.apply_attributes(node_feat_vect, node_id, feature_index)
+
+    
+    def apply_attribute_vector(self, feature_vector, node_id, feature_dict):
+        key_array = feature_dict.keys()
+        self.graph.node[node_id]['attributes'] = [0 for x in range(len(key_array))]
+        for key in range(len(feature_dict)):
+            self.graph.node[node_id]['attributes'][key] = feature_vector[int(key)]
+
+    
+    def apply_attributes(self, feature_vector, node_id, feature_dict):
+        key_array = feature_dict.keys()
+        self.graph.node[node_id]['named_attributes'] = {}
+        for key in range(len(feature_dict)):
+            self.graph.node[node_id]['named_attributes'][feature_dict[str(key)]] = feature_vector[int(key)]
+
+    def load_nodes(self, edge_feat_path, feature_index):
+        key_array = feature_index.keys()
+        with open(edge_feat_path, 'r') as file:
+            for line in file:
+                try:
+                    features = [int(x) for x in line.split(' ')]
+                    node = features[0]
+                    feature_vect = features[1:]
+                    self.graph.add_node(node)
+                    
+                    self.apply_attribute_vector(feature_vect, node, feature_index)
+                    self.apply_attributes(feature_vect, node, feature_index)
+                except Exception as e:
+                    print "error: %s" % e
+
+    def load_edges(self, path):
+        try:
+            edge_file_contents = open(path)
+        except IOError:
+            print "Error reading edge file contents"
+        for line in edge_file_contents:
+            edges = [int(x) for x in line.split(' ')]
+            self.graph.add_edge(edges[0], edges[1])
+
+    
+    def add_empty_subgraph(self):
+        for node in self.graph.nodes():
+            self.graph.node[node]['subgraphs'] = {}
+
+    
+    def apply_ground_truths(self, path, count):
+        file = open(path)
+        for line in file:
+            if line[-1] == '\n':
+                line = line[:-1]
+            circle = line.split()
+            for node in circle[1:]:
+                # add an entry to subgraphs of the ground truth set 
+                self.graph.node[int(node)]['subgraphs'][count] = 1
+            count += 1
+        return count
+
+
+    def named_attributes_to_vector(self):
+        # extract all named node features into a dictionary containing all known features of the graph 
+        # for each node produce a vector that is consistent with the size of the large feature dictionary
+        # note: this will result in very large attribute vectors - but feature selection will reduce the size
+        total = {}
+        for node in self.graph.nodes():
+            for element in self.graph.node[node]['named_attributes']:
+                if element not in total:
+                    total[element] = 1
+        sorted_dict = sorted(total.items(), key=operator.itemgetter(0))
+        
+        v = DictVectorizer(sparse=False)
+        for node in self.graph.nodes():
+            X = v.fit_transform([total, self.graph.node[node]['named_attributes']])
+            # nx.set_node_attributes(G, 'full_featvector', {node: X[1].tolist()})
+            self.graph.node[node]['feature_vector'] = X[1].tolist() # numpy arrays cannot be stored properly
+        
+
+    def draw_nx_graph(self):
+        nx.draw(self.graph)
+        plt.show()
+
 
 def edge_list_from_file(path, delim="\t"):
     with open(path, 'rb') as f:
@@ -32,176 +173,3 @@ def edge_list_from_file(path, delim="\t"):
         except Exception as e:
             print e
     return edges
-
-def load_edges(path, G):
-    with open(path, 'r') as edge_file:
-        for line in edge_file:
-            edges = [int(x) for x in line.split(' ')]
-            G.add_edge(edges[0], edges[1])
-
-    return G
-
-
-def graph_nx(edges):
-    G = nx.Draph()
-    G.add_edges_from(edges)
-    return G
-
-def draw_nx_graph(Graph):
-    nx.draw(Graph)
-    plt.show()
-
-def load_attributes(feature_file_path):
-    # create dictionary of features keys and values
-    feature_index = {}
-    with open(feature_file_path, 'r') as feature_file:
-        for line in feature_file:
-            feature = line.split(' ')
-            feature_index[feature[0]] = feature[1][:-1]
-    
-    return feature_index
-
-def apply_attribute_vector(feature_vector, node_id, G, feature_dict):
-    key_array = feature_dict.keys()
-    # G.node[node_id]['attributes'] = np.zeros(len(feature_dict))
-    G.node[node_id]['attributes'] = [0 for x in range(len(key_array))]
-
-    # print("key %d feature vector %s len feature vector %s" %(node, feature_vect, len(feature_vect)))
-    for key in range(len(feature_dict)):
-        G.node[node_id]['attributes'][key] = feature_vector[int(key)]
-        # print( type(G.node[node_id]['attributes']))
-        # G.node[node_id]['attributes'].tolist()
-
-        
-def apply_attributes(feature_vector, node_id, G, feature_dict):
-    key_array = feature_dict.keys()
-    # print feature_dict
-    G.node[node_id]['named_attributes'] = {}
-    # print("key %d feature vector %s len feature vector %s" %(node, feature_vect, len(feature_vect)))
-    for key in range(len(feature_dict)):
-        G.node[node_id]['named_attributes'][feature_dict[str(key)]] = feature_vector[int(key)] 
-
-
-def load_nodes(edge_feat_path, feature_index, G):
-    key_array = feature_index.keys()
-
-    with open(edge_feat_path, 'r') as file:
-        for line in file:
-            try:
-                features = [int(x) for x in line.split(' ')]
-                node = features[0]
-                feature_vect = features[1:]
-                G.add_node(node)
-                
-                apply_attribute_vector(feature_vect, node, G, feature_index)
-                apply_attributes(feature_vect, node, G, feature_index)
-            except Exception as e:
-                print "error: %s" % e
-            
-
-def load_node_features(node_feat_file, feature_index, G, node_id):
-    # print feature_index.values()
-    key_array = feature_index.keys()
-    with open(node_feat_file, 'r') as file:
-        vector_string = file.read()[:-1]
-        node_feat_vect = [int(x) for x in vector_string.split(' ')]
-        apply_attribute_vector(node_feat_vect, node_id, G, feature_index)
-        apply_attributes(node_feat_vect, node_id, G, feature_index)
-
-def named_attributes_to_vector(G):
-    
-    # extract all named node features into a dictionary containing all known features of the graph 
-    # for each node produce a vector that is consistent with the size of the large feature dictionary
-    # note: this will result in very large attribute vectors - but feature selection will reduce the size
-    total = {}
-    for node in G.nodes():
-        for element in G.node[node]['named_attributes']:
-            if element not in total:
-                total[element] = 1
-    sorted_dict = sorted(total.items(), key=operator.itemgetter(0))
-    
-    v = DictVectorizer(sparse=False)
-    for node in G.nodes():
-        
-        X = v.fit_transform([total, G.node[node]['named_attributes']])
-        # nx.set_node_attributes(G, 'full_featvector', {node: X[1].tolist()})
-        G.node[node]['feature_vector'] = X[1].tolist() # numpy arrays cannot be stored properly
-        
-def save_as_pickle(path, graph):
-    # TODO: does not save feature vector attributes properly
-    nx.write_gpickle(graph, path)
-
-def save(path, graph):
-
-    save_file = json_graph.node_link_data(graph)
-    json.dump(save_file, open(path, 'w'), indent=2)
-
-def main(args):
-    if args[1] == '--create':
-        
-        graph = nx.DiGraph()
-        if len(args) <= 2:
-            print("Argument error: --load [data directory] \n")
-            print("exiting...")
-            sys.exit()
-
-        data_dir = os.path.join(_dir + "/" + args[2])
-            
-        nodes = [int(x.split("/")[-1].split('.')[0]) for x in glob.iglob(data_dir + "/*.featnames")]
-        
-        for node in nodes:
-            # get file paths
-            feature_name_file = os.path.join(data_dir + "/%s.featnames" % node)
-            edge_file = os.path.join(data_dir + "/%s.edges" % node)
-            edge_feat_file = os.path.join(data_dir + "/%s.feat" % node)
-            node_feat_file = os.path.join(data_dir + "/%s.egofeat" % node)
-            
-            # load nodes/attributes onto graph
-            
-            graph.add_node(node)
-            attribute_dict = load_attributes(feature_name_file)
-            load_node_features(node_feat_file, attribute_dict, graph, node)
-            load_nodes(edge_feat_file, attribute_dict, graph)
-            
-            load_edges(edge_file, graph)
-        named_attributes_to_vector(graph)
-        save(os.path.join(data_dir + "/" + args[3] + '.json'), graph)
-        # save_as_pickle(os.path.join(data_dir + "/" + args[3]), graph)
-
-
-def wrapper(path, G_type='uni'):
-    if G_type == "directed":
-        print ("Returning Directed Graph...")
-        graph = nx.DiGraph()
-    else:
-        print ("Returning Undirected Graph...")
-        graph = nx.Graph()
-
-
-    data_dir = os.path.join(_dir + "/" + path)
-        
-    nodes = [int(x.split("/")[-1].split('.')[0]) for x in glob.iglob(data_dir + "/*.featnames")]
-
-
-    for node in nodes:
-        # get file paths
-        feature_name_file = os.path.join(data_dir + "/%s.featnames" % node)
-        edge_file = os.path.join(data_dir + "/%s.edges" % node)
-        edge_feat_file = os.path.join(data_dir + "/%s.feat" % node)
-        node_feat_file = os.path.join(data_dir + "/%s.egofeat" % node)
-        
-        # load nodes/attributes onto graph
-        
-        graph.add_node(node)
-        attribute_dict = load_attributes(feature_name_file)
-        load_node_features(node_feat_file, attribute_dict, graph, node)
-        load_nodes(edge_feat_file, attribute_dict, graph)
-        load_edges(edge_file, graph)
-    named_attributes_to_vector(graph)
-    
-
-
-    return graph
-
-if __name__ == "__main__":
-    main(sys.argv)

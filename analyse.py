@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 import scipy as sp
 import json
 import os
+from sklearn.decomposition import PCA
 from networkx.readwrite import json_graph
 from load import wrapper
 
@@ -32,7 +33,6 @@ def hadamard_product(a, b):
     # practically an XOR on arrays with units of 0 and 1
     return np.multiply(a, b)
 
-
 def internal_consistency(graph, w_i=None):
     node_list = graph.nodes()
     internal_consistency = 0.0
@@ -52,8 +52,11 @@ def internal_consistency(graph, w_i=None):
             )
 
             # element-wise product of attribute vectors
-            x_i = np.array(graph.node[node_list[i]]['feature_vector'])
-            x_j = np.array(graph.node[node_list[j]]['feature_vector'])
+            # x_i = np.array(graph.node[node_list[i]]['feature_vector'])
+            # x_j = np.array(graph.node[node_list[j]]['feature_vector'])
+            x_i = np.array(graph.node[node_list[i]]['decomp_features'])
+            x_j = np.array(graph.node[node_list[j]]['decomp_features'])
+        
             elewise_product = hadamard_product(x_i, x_j)
             if w_i is not None:
                 elewise_product = np.multiply(elewise_product, w_i)
@@ -66,7 +69,7 @@ def internal_consistency(graph, w_i=None):
 def boundary_edges(G):
     E_list = []
     for edge in G.edges():
-        if G.node[edge[0]]['subgraph'] != G.node[edge[1]]['subgraph']:
+        if G.node[edge[0]]['subgraphs'] != G.node[edge[1]]['subgraphs']:
             E_list.append(edge)
     return E_list
     
@@ -83,8 +86,11 @@ def external_separability(G, E, w_e=None):
             G.degree(edge[1]), 
             len(G.edges())
         )
-        x_i = np.array(G.node[edge[0]]['feature_vector'])
-        x_b = np.array(G.node[edge[1]]['feature_vector'])
+        # x_i = np.array(G.node[edge[0]]['feature_vector'])
+        # x_b = np.array(G.node[edge[1]]['feature_vector'])
+        x_i = np.array(G.node[edge[0]]['decomp_features'])
+        x_b = np.array(G.node[edge[1]]['decomp_features'])
+        
         elewise_product = hadamard_product(x_i, x_b)
         if w_e is not None:
             elewise_product = np.multiply(elewise_product, w_e)
@@ -111,46 +117,33 @@ def cluster_by_degree(graph):
             graph.node[node]['subgraph'] = 'B'
 
 
-def silly_cluster(graph):
-    # assign silly way of getting two subgraphs (useing betweenness_centrality)
-    betweeness_dict = nx.betweenness_centrality(graph)
-    max_val = max(betweeness_dict.values())
-    lim = np.average(betweeness_dict.values())/max_val
-
-    for key in betweeness_dict.keys():
-        if betweeness_dict[key]/max_val > lim:
-            graph.node[key]['subgraph'] = 'C'
-        else:
-            graph.node[key]['subgraph'] = 'B'
-
 def subgraph_separate(graph):
-    C_list = []
-    B_list = []
-    for node in graph.nodes():
-        if graph.node[node]['subgraph'] == 'C':
-            C_list.append(node)
-        else:
-            B_list.append(node)
-    C = graph.subgraph(C_list) 
+    subgraphs = []
+    count = 0
+    remaining_subgraphs = True 
+    while remaining_subgraphs:
+        subgraph_nodes = []
+        for node in graph.nodes():
+            if 'subgraphs' in graph.node[node]:
+                if count in graph.node[node]['subgraphs']:
+                    subgraph_nodes.append(node)
+        count += 1
+        if len(subgraph_nodes) == 0:
+            break
+        subgraphs.append(graph.subgraph(subgraph_nodes))
+        del subgraph_nodes
+    return subgraphs
 
-    return C
-
-def cluster_and_subgraph(graph):
-    cluster_by_degree(graph)
-    # silly_cluster(graph)
-    C = subgraph_separate(graph)
-    
-    return C
 
 def calculate_normality(C, graph):
     I = internal_consistency(C)
     print("Internal Consistency: %f"  % I)
     E = external_separability(graph, boundary_edges(graph))
     print("External Separability: %f"  % E)
-    # Calculat Normality
+    # Calculate Normality
     N = I - E
     print("Normality: %f" % N)
-    print("Optizmize the function...")
+    print("Optizmizing weight vector...")
     objective_optimization(graph, C)
     return N
 
@@ -162,14 +155,14 @@ def calculate_imin(C, adj_m):
             minimum += -(C.degree(node_list[i])*C.degree(node_list[i]))/(2.0*len(C.edges()))
     return minimum
 
-def optimize(x_i, C, G, i_max): # taking out one weight vector for simplisiticity
+def optimize(w_v, C, G, i_max): # taking out one weight vector for simplisiticity
     # TODO: make this parameters more efficient
     # x_i, x_i = weight_vectors
-    return i_max-(internal_consistency(C, x_i) - external_separability(G, boundary_edges(G), x_i))
+    return internal_consistency(C, w_v[0]) - external_separability(G, boundary_edges(G), w_v[1])
 
 def objective_optimization(graph, C):
     adj_m = nx.adjacency_matrix(C)
-    length = sum([len(graph.node[x]['feature_vector']) for x in graph.nodes()])/len(graph.nodes())
+    length = sum([len(graph.node[x]['decomp_features']) for x in graph.nodes()])/len(graph.nodes())
     I_max = float(len(adj_m.toarray())**2)
     I_min = calculate_imin(C, adj_m)
     x_i = np.ones(length)
@@ -179,21 +172,41 @@ def objective_optimization(graph, C):
     
     
     # res = sp.optimize.minimize(fun=optimize, method='BFGS', jac=True, args=(x_i, C, graph), options={"maxiter": 5000}, bounds=bounds)
-    # res = sp.optimize.minimize(
-    #     optimize, # function 
-    #     x_i, # weight vector 
-    #     args=(C, graph, I_max, ), # other parameters to be passed in as arguments to the function
-    #     method='L-BFGS-B',
-    #     bounds=bnds, # bounds of the weight vector
-    #     options={"maxiter": 20}
-    #     )
-    # print "weight vector after optimisation: %s" % res.x
-    # print "results after optimisation of weight vector==="
-    # print "Normality: %f" % (optimize(res.x, C, graph, I_max))
+    res = sp.optimize.minimize(
+        optimize, # function 
+        [x_i, x_e], # weight vector 
+        args=(C, graph, I_max, ), # other parameters to be passed in as arguments to the function
+        method='L-BFGS-B',
+        bounds=bnds, # bounds of the weight vector
+        options={"maxiter": 30}
+        )
+    print "weight vector after optimisation: %s" % res.x
+    print "results after optimisation of weight vector==="
+    print "Normality: %f" % (optimize(res.x, C, graph, I_max))
+
+def decomposition(graph):
+    # random_arr = [[0, 1, 0, 0, 1],[1, 0, 0, 1, 1]]
+    # using PCA decompose the feature vectors into a smaller feature matrix 
+    pca = PCA(n_components=4)
+    feature_matrix = []
+    for node in graph.nodes():
+        feature_matrix.append(graph.node[node]['feature_vector'])
+    # x_list = [x[0] for x in zip(random_arr)] 
+    sk_transf = pca.fit_transform(np.array(feature_matrix))
+    print sk_transf
+    for i, node in enumerate(graph.nodes()):
+        graph.node[node]['decomp_features'] = sk_transf[i]  
     
+
+
 def operations(graph):
-    I = cluster_and_subgraph(graph)
-    calculate_normality(I, graph)
+    decomposition(graph)
+    subgraphs = subgraph_separate(graph)
+    count = 1
+    for subgraph in subgraphs:
+        print "subgraph: %d" % count 
+        calculate_normality(subgraph, graph)
+        count += 1
 
 def main(args):
     # TODO: add argument parser
