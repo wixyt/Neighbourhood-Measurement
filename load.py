@@ -48,26 +48,23 @@ class GraphLoader(object):
         subgraph_count = 0 # value to keep track on total number of subgraphs
         try:
             for node in self.file_nodes: 
-                try:
-                    # establish file paths
-                    feature_name_file = os.path.join(self.path + "/%s.featnames" % node)
-                    edge_file = os.path.join(self.path + "/%s.edges" % node)
-                    edge_feat_file = os.path.join(self.path + "/%s.feat" % node)
-                    node_feat_file = os.path.join(self.path + "/%s.egofeat" % node)
-                    circles_file = os.path.join(self.path + "/%s.circles" % node)
-                except Exception as e:
-                    print "Error loading file path: %s" % e
-                    return False
-                # load nodes/attributes onto graph
                 
-                    self.graph.add_node(node)
-                    attribute_dict = self.load_attributes(feature_name_file)
+                # establish file paths
+                feature_name_file = os.path.join(self.path + "/%s.featnames" % node)
+                edge_file = os.path.join(self.path + "/%s.edges" % node)
+                edge_feat_file = os.path.join(self.path + "/%s.feat" % node)
+                node_feat_file = os.path.join(self.path + "/%s.egofeat" % node)
+                circles_file = os.path.join(self.path + "/%s.circles" % node)
+                # load nodes/attributes onto graph
+            
+                self.graph.add_node(node)
+                attribute_dict = self.load_attributes(feature_name_file)
 
-                    self.load_node_features(node_feat_file, attribute_dict, node)
-                    self.load_nodes(edge_feat_file, attribute_dict)
-                    self.load_edges(edge_file)
-                    self.add_empty_subgraph()
-                    subgraph_count += self.apply_ground_truths(circles_file, subgraph_count)
+                self.load_node_features(node_feat_file, attribute_dict, node)
+                self.load_nodes(edge_feat_file, attribute_dict)
+                self.load_edges(edge_file)
+                self.add_empty_subgraph()
+                subgraph_count += self.apply_ground_truths(circles_file, subgraph_count)
                 
             self.named_attributes_to_vector()
         except IOError:
