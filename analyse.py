@@ -9,18 +9,11 @@ import json
 import os
 from sklearn.decomposition import PCA
 from networkx.readwrite import json_graph
-from load import wrapper
 
+class Normality(object):
+    def __init__(self):
+        pass
 
-
-def read_json_file(path):
-    with open(path, 'rb') as f:
-        js_graph = json.load(f)
-        try:
-            graph = json_graph.node_link_graph(js_graph)
-        except NetworkXError as e:
-            print "%s" % e
-    return graph
 
 
 def suprise_metric(link, i_degree, j_degree, edges):
@@ -185,18 +178,15 @@ def objective_optimization(graph, C):
     print "Normality: %f" % (optimize(res.x, C, graph, I_max))
 
 def decomposition(graph):
-    # random_arr = [[0, 1, 0, 0, 1],[1, 0, 0, 1, 1]]
     # using PCA decompose the feature vectors into a smaller feature matrix 
     pca = PCA(n_components=4)
     feature_matrix = []
     for node in graph.nodes():
         feature_matrix.append(graph.node[node]['feature_vector'])
-    # x_list = [x[0] for x in zip(random_arr)] 
     sk_transf = pca.fit_transform(np.array(feature_matrix))
     print sk_transf
     for i, node in enumerate(graph.nodes()):
         graph.node[node]['decomp_features'] = sk_transf[i]  
-    
 
 
 def operations(graph):

@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 import sys
 
 def parse_arguments():
@@ -137,9 +138,9 @@ def main():
     print "Size of feature vector: %d" % len(graphObj.graph.node[graphObj.graph.nodes()[0]]['feature_vector'])
     
     try:
-        import analyse
-    except ImportError:
-        print "analyse.py file does not exist!"
+        from analyse import Normality
+    except ImportError as imp_e:
+        print "analyse.py file does not exist! %s " % imp_e
         sys.exit()
 
 if __name__ == "__main__":

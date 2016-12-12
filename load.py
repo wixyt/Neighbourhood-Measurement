@@ -1,13 +1,11 @@
 #!/usr/bin/env python
 import sys
-import snap
 import networkx as nx
 import numpy as np
 import os, os.path
 import glob
 import math
 import operator
-from sklearn.feature_extraction import DictVectorizer
 
 
 
@@ -19,6 +17,20 @@ class GraphLoader(object):
         self.file_nodes = [ int ] 
 
     
+    def read_json_file(self, path):
+        try:
+            file = open(path)
+            js_graph = json.load(f)
+            try:
+                graph = json_graph.node_link_graph(js_graph)
+            except NetworkXError as e:
+                print "Error loading Json graph: %s" % e
+            return graph
+        except IOError:
+            print "error reading JSON graph file"
+            return False
+            
+
     def save(self, path):
         try: 
             from networkx.readwrite import json_graph
@@ -35,60 +47,69 @@ class GraphLoader(object):
         json.dump(save_file, open(path, 'w'), indent=2)
         return True
 
+
     def load_files(self, args):
-        self.path = os.path.join(os.path.dirname(os.path.realpath(__file__)) + "/" + args[0])
-        self.file_nodes = [int(x.split("/")[-1].split('.')[0]) for x in glob.iglob(self.path + "/*.featnames")]
-        self.directed = args[1]
-        try:
-            import networkx as nx
-        except ImportError:
-            print "Networkx library does not exist"
-            return False
-        if self.directed:
-            self.graph = nx.DiGraph()
+        if args[0].endswith('.json'):
+            self.graph = read_json_file(args[0])
+            return True
         else:
-            self.graph = nx.Graph()
+            self.path = os.path.join(os.path.dirname(os.path.realpath(__file__)) + "/" + args[0])
+            self.file_nodes = [int(x.split("/")[-1].split('.')[0]) for x in glob.iglob(self.path + "/*.featnames")]
+            self.directed = args[1]
+            try:
+                import networkx as nx
+            except ImportError:
+                print "Networkx library does not exist"
+                return False
+            if self.directed:
+                self.graph = nx.DiGraph()
+            else:
+                self.graph = nx.Graph()
 
-        subgraph_count = 0 # value to keep track on total number of subgraphs
-        try:
-            for node in self.file_nodes: 
+            subgraph_count = 0 # value to keep track on total number of subgraphs
+            try:
+                for node in self.file_nodes: 
+                    
+                    # establish file paths
+                    feature_name_file = os.path.join(self.path + "/%s.featnames" % node)
+                    edge_file = os.path.join(self.path + "/%s.edges" % node)
+                    edge_feat_file = os.path.join(self.path + "/%s.feat" % node)
+                    node_feat_file = os.path.join(self.path + "/%s.egofeat" % node)
+                    circles_file = os.path.join(self.path + "/%s.circles" % node)
+                    # load nodes/attributes onto graph
                 
-                # establish file paths
-                feature_name_file = os.path.join(self.path + "/%s.featnames" % node)
-                edge_file = os.path.join(self.path + "/%s.edges" % node)
-                edge_feat_file = os.path.join(self.path + "/%s.feat" % node)
-                node_feat_file = os.path.join(self.path + "/%s.egofeat" % node)
-                circles_file = os.path.join(self.path + "/%s.circles" % node)
-                # load nodes/attributes onto graph
-            
-                self.graph.add_node(node)
-                attribute_dict = self.load_attributes(feature_name_file)
+                    self.graph.add_node(node)
+                    attribute_dict = self.load_attributes(feature_name_file)
 
-                self.load_node_features(node_feat_file, attribute_dict, node)
-                self.load_nodes(edge_feat_file, attribute_dict)
-                self.load_edges(edge_file)
-                self.add_empty_subgraph()
-                subgraph_count += self.apply_ground_truths(circles_file, subgraph_count)
-                
-            self.named_attributes_to_vector()
-        except IOError:
-            print "IOError in main load function"
-            return False
-        # return True
+                    self.load_node_features(node_feat_file, attribute_dict, node)
+                    self.load_nodes(edge_feat_file, attribute_dict)
+                    self.load_edges(edge_file)
+                    self.add_empty_subgraph()
+                    subgraph_count += self.apply_ground_truths(circles_file, subgraph_count)
+            except IOError:
+                print "IOError in main load function"
+                return False
+            except Exception as e:
+                print "undefined error occurred %s" % sys.exc_info()[0]
+                return False
+            else:
+                self.named_attributes_to_vector()
+                # returns True
+
 
     def load_attributes(self, feature_file_path):
         # create dictionary of features keys and values
         feature_index = {}
         try: 
             feature_file_contents = open(feature_file_path)
+            for line in feature_file_contents:
+                feature = line.split(' ')
+                feature_index[feature[0]] = feature[-1][:-1]
+            return feature_index
         except IOError:
             print("Could not open feature file.")
-            return False
-        for line in feature_file_contents:
-            feature = line.split(' ')
-            feature_index[feature[0]] = feature[-1][:-1]
-
-        return feature_index
+            raise ImportError
+        
 
 
     def load_node_features(self, node_feat_file, feature_index, node_id):
@@ -97,7 +118,7 @@ class GraphLoader(object):
             file = open(node_feat_file)
         except IOError:
             print "Could not open node feature file %s" % node_feat_file
-            return False
+            raise IOError
         vector_string = file.read()[:-1]
         node_feat_vect = [int(x) for x in vector_string.split(' ')]
         self.apply_attribute_vector(node_feat_vect, node_id, feature_index)
@@ -181,6 +202,13 @@ class GraphLoader(object):
                     total[element] = 1
         sorted_dict = sorted(total.items(), key=operator.itemgetter(0))
         
+        try:
+            # function is normally only called once so import is okay here TODO: check this
+            from sklearn.feature_extraction import DictVectorizer
+        except ImportError:
+            print "sklearn module missing"
+            return False
+
         v = DictVectorizer(sparse=False)
         for node in self.graph.nodes():
             X = v.fit_transform([total, self.graph.node[node]['named_attributes']])
