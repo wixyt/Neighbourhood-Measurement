@@ -31,6 +31,7 @@ def test_load_module(module):
             if type(gl_class) == type(tc):
                 print "GraphLoader does not inherit from Object Class"
             raise TestingError()
+        print "Graph Loader Module Exists"
     except AttributeError:
         print "Graph loader does not exist"
         raise TestingError()
@@ -74,6 +75,8 @@ def test_load_module(module):
             if hasattr(module.GraphLoader, 'file_nodes'):
                 print "'file_nodes' is a class variable and does not belong to the instance"
                 raise TestingError()
+
+            print "Load File Attributes Verified"
         except TestingError:
             raise TestingError()
         except Exception as e:
@@ -84,11 +87,31 @@ def test_load_module(module):
         raise TestingError()
     
     test_load = module.GraphLoader()
-    test_load.load_files('testdata/', False)
-    print type(test_load.graph)
-    assert test_load.graph
+    test_load.load_files(['testdata/', False])
 
+    try: 
+        import networkx as nx
+    except ImportError:
+        print "error importing networkx library, make sure this is installed"
+        raise TestingError()
+    try:
+        assert type(test_load.graph) == type(nx.Graph()), "Type of Networkx Graph"
+        print "Graph exists and is of correct graph type"
+    except AssertionError:
+        print "Graph data structure does not exist"
+        raise TestingError()
 
+    try:
+        assert test_load.graph.size() == 6
+        assert len(test_load.graph.nodes()) == 6
+        assert len(test_load.graph.node[test_load.graph.nodes()[0]]['feature_vector']) == 5
+        print "test graph features loaded correctly"
+    except AssertionError:
+        print "test graph features did not load correctly - check parameters"
+        raise TestingError()
+    print "-" * 40
+    print "All tests passed"
+    print "-" * 40
 
 def main():
 
@@ -113,6 +136,11 @@ def main():
     print "Number of nodes: %d" % len(graphObj.graph.nodes())
     print "Size of feature vector: %d" % len(graphObj.graph.node[graphObj.graph.nodes()[0]]['feature_vector'])
     
+    try:
+        import analyse
+    except ImportError:
+        print "analyse.py file does not exist!"
+        sys.exit()
 
 if __name__ == "__main__":
     main()

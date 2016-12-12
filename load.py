@@ -38,11 +38,15 @@ class GraphLoader(object):
     def load_files(self, args):
         self.path = os.path.join(os.path.dirname(os.path.realpath(__file__)) + "/" + args[0])
         self.file_nodes = [int(x.split("/")[-1].split('.')[0]) for x in glob.iglob(self.path + "/*.featnames")]
+        self.directed = args[1]
+        try:
+            import networkx as nx
+        except ImportError:
+            print "Networkx library does not exist"
+            return False
         if self.directed:
-            print ("Directed Graph...")
             self.graph = nx.DiGraph()
         else:
-            print ("Undirected Graph...")
             self.graph = nx.Graph()
 
         subgraph_count = 0 # value to keep track on total number of subgraphs
@@ -70,7 +74,7 @@ class GraphLoader(object):
         except IOError:
             print "IOError in main load function"
             return False
-        return True
+        # return True
 
     def load_attributes(self, feature_file_path):
         # create dictionary of features keys and values
