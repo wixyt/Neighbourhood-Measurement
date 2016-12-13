@@ -114,6 +114,24 @@ def test_load_module(module):
     print "All tests passed"
     print "-" * 40
 
+def breadth_first_search(graph, start_node):
+    marked, queue = set(), [start_node]
+    while queue:
+        vertex = queue.pop(0)
+        if vertex not in marked:
+            marked.add(vertex)
+            queue.extend(graph[vertex] - marked)
+    return marked
+
+def depth_first_search(graph, start_node, marked=None):
+    # Graph = {1: [EDGES], 2: [EDGES], ... }
+    if marked is None:
+        marked = set()
+    marked.add(start_node)
+    for next in graph[start_node] - marked:
+        depth_first_search(graph, next, marked)
+    return marked
+
 def main():
 
     args = parse_arguments()
@@ -142,6 +160,9 @@ def main():
     except ImportError as imp_e:
         print "analyse.py file does not exist! %s " % imp_e
         sys.exit()
+
+    normality = Normality()
+    normality.calculate(graphObj.graph, set([0, 1]))
 
 if __name__ == "__main__":
     main()

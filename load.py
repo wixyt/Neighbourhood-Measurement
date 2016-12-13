@@ -75,6 +75,7 @@ class GraphLoader(object):
                     edge_file = os.path.join(self.path + "/%s.edges" % node)
                     edge_feat_file = os.path.join(self.path + "/%s.feat" % node)
                     node_feat_file = os.path.join(self.path + "/%s.egofeat" % node)
+                    # TODO: try except statement for when circles files does not exist - do not add groundtruths etc
                     circles_file = os.path.join(self.path + "/%s.circles" % node)
                     # load nodes/attributes onto graph
                 
@@ -225,7 +226,7 @@ class GraphLoader(object):
         plt.show()
         return True
 
-
+## Keeping this for later
 def edge_list_from_file(path, delim="\t"):
     with open(path, 'rb') as f:
         reader = csv.reader(f, delimiter=delim)

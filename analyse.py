@@ -10,9 +10,113 @@ import os
 from sklearn.decomposition import PCA
 from networkx.readwrite import json_graph
 
+class TestingError(Exception):
+    """
+    Errors for specific problems occuring with the calculation of normality of use of graphs
+    TODO change name 
+    """
+
 class Normality(object):
+    """
+        Class for calculating normality of a given subset of nodes and associated edge nodes    
+    """
     def __init__(self):
-        pass
+        """
+            params: 
+            total-graph: surrounding graph structure set
+            subgraph: subset of total graph
+            target: used for evaluation of normality of adding additional node to the subset
+        """
+        self.total_graph = None
+        self.subgraph = None # node list
+        self.target_node = int
+
+
+    def calculate(self, total_graph, subgraph, target=None):
+        # Ensure total_graph and subgraph is of the right type
+        assert (type(total_graph) == type(nx.Graph()) or type(total_graph) == (nx.DiGraph())), "Total Graph not type of Nx graph"
+        assert type(subgraph) == type(set()), "Subgraph not of type list"
+        self.total_graph = total_graph
+        self.subgraph = total_graph.subgraph(subgraph)
+        
+        # Mark subgraph on total graph 
+        self.mark_subgraph()
+        # find edge nodes of subgraph
+        self.edge_nodes = self.boundary_edges()
+        
+        I = self.internal_consistency(self.subgraph)
+        E = self.external_separability(self.total_graph, self.edge_nodes)
+        N = I - E
+        return N
+
+
+    def mark_subgraph(self):
+        graph_nodes = set(self.total_graph.nodes())
+        subg_nodes = set(self.subgraph.nodes())
+        for node in graph_nodes:
+            if node in subg_nodes:
+                self.total_graph.node[node]['subgraph'] = 1 # ? make this part of subgraph count
+            else:
+                self.total_graph.node[node]['subgraph'] = 0
+        
+    
+    def boundary_edges(self):
+        E_list = []
+        for edge in self.total_graph.edges():
+            if self.total_graph.node[edge[0]]['subgraph'] != self.total_graph.node[edge[1]]['subgraph']:
+                E_list.append(edge)
+        return E_list
+
+    
+    def internal_consistency(self, G, w_i=None):
+        node_list = G.nodes()
+        internal_consistency = 0.0
+        adj_m = nx.adj_matrix(G, node_list).toarray()
+        length = (adj_m.shape)[1]
+        total_edges = G.size()
+        
+        for i in range(length):
+            for j in range(length):
+                # get index for the "suprise value" between two nodes
+                suprise_index = adj_m[i][j] - \
+                (G.degree(node_list[i])*G.degree(node_list[j]))/(2.0*total_edges)
+
+                x_i = np.array(G.node[node_list[i]]['feature_vector'])
+                x_j = np.array(G.node[node_list[j]]['feature_vector'])
+                # x_i = np.array(graph.node[node_list[i]]['decomp_features'])
+                # x_j = np.array(graph.node[node_list[j]]['decomp_features'])
+            
+                elewise_product = np.multiply(x_i, x_j)
+                if w_i is not None:
+                    elewise_product = np.multiply(elewise_product, w_i)
+                total = np.multiply(elewise_product, suprise_index)
+                internal_consistency += np.sum(total)
+        
+        return internal_consistency
+
+    def external_separability(self, G, E, w_e=None):
+        external_separability = 0.0 
+        # ideally it should be low for high quality neighbourhood
+
+        for edge in E:
+            unsup_metric = unsuprising_metric(
+                G.degree(edge[0]), 
+                G.degree(edge[1]),
+                G.size()
+            )
+            
+            x_i = np.array(G.node[edge[0]]['feature_vector'])
+            x_b = np.array(G.node[edge[1]]['feature_vector'])
+            # x_i = np.array(G.node[edge[0]]['decomp_features'])
+            # x_b = np.array(G.node[edge[1]]['decomp_features'])
+            
+            elewise_product = np.multiply(x_i, x_b)
+            if w_e is not None:
+                elewise_product = np.multiply(elewise_product, w_e)
+            total = np.multiply(elewise_product, unsup_metric)
+            external_separability += np.sum(total)
+
+        return external_separability
 
 
 
