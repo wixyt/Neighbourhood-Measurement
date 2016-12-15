@@ -34,7 +34,7 @@ class Normality(object):
         self.edge_nodes = []
 
 
-    def calculate(self, total_graph, subgraph, target=None):
+    def calculate(self, total_graph, subgraph, target=None, decompose=None):
         # Ensure total_graph and subgraph is of the right type
         assert (type(total_graph) == type(nx.Graph()) or type(total_graph) == (nx.DiGraph())), "Total Graph not type of Nx graph"
         assert type(subgraph) == type(list()), "Subgraph not of type list"
@@ -43,8 +43,8 @@ class Normality(object):
         self.subgraph_nodes = [
             {x: [y for y in nx.all_neighbors(self.total_graph, x)]} for x in subgraph
         ]
-        print self.subgraph_nodes
-        
+        if decompose is not None:
+            self.decomposition(self.total_graph)
 
         I = self.internal_consistency(self.subgraph)
         E = self.external_separability(self.total_graph, self.edge_nodes)
@@ -115,9 +115,9 @@ class Normality(object):
     def q(self, W, i_max, i_min, C, G):
         # x_e is the summation product of external_separability using the weight vector
         # x_i is the summation product of internal_consistency using the weight vector
-        # print type(C)
         x_i = self.internal_consistency(C, W)
         x_e = self.external_separability(G, self.edge_nodes, W)
+        # TODO: fix equation to not divide by zero (x_i - x_e) can potentially converge to equal value
         return -((x_i - i_min)/(i_max-i_min))+(x_e/(x_i-x_e))
 
     def objective_optimization(self, graph, C):
@@ -137,15 +137,28 @@ class Normality(object):
             bounds=bnds, # bounds of the weight vector
             options={"maxiter": 30}
             )
-        print "Imax: %f" % I_max
-        print "Imin: %f" % I_min
-        print "weight vector after optimisation: %s" % res.x
-        print "results after optimisation of weight vector==="
-        print "Normality: %f" % (self.q(res.x, I_max, I_min, C, graph))
+
+        # print "Imax: %f" % I_max
+        # print "Imin: %f" % I_min
+        # print "weight vector after optimisation: %s" % res.x
+        # print "results after optimisation of weight vector==="
+        # print "Normality: %f" % (self.q(res.x, I_max, I_min, C, graph))
+        return self.q(res.x, I_max, I_min, C, graph)
 
 
     def unsuprising_metric(self, k_i, k_b, edges):
         return (1 - min(1, (k_i*k_b)/(2.0*edges)))
+
+    
+    def decomposition(self, graph):
+        # using PCA decompose the feature vectors into a smaller feature matrix 
+        pca = PCA(n_components=4)
+        feature_matrix = []
+        for node in graph.nodes():
+            feature_matrix.append(graph.node[node]['feature_vector'])
+        sk_transf = pca.fit_transform(np.array(feature_matrix))
+        for i, node in enumerate(graph.nodes()):
+            graph.node[node]['feature_vector'] = sk_transf[i]
 
 
 # def suprise_metric(link, i_degree, j_degree, edges):
