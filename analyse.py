@@ -52,14 +52,6 @@ class Normality(object):
         print self.objective_optimization(self.total_graph, self.subgraph)
         return N
 
-    def find_edge_nodes(self):
-        # TODO: Find a better way of doing this
-        for x in self.subgraph_nodes:
-            for y in x.values():
-                for z in y:
-                    if z not in subgraph:
-                        self.edge_nodes.append((x.keys()[0], z))
-        
     
     def internal_consistency(self, G, W=None):
         node_list = G.nodes()
@@ -76,9 +68,7 @@ class Normality(object):
 
                 x_i = np.array(G.node[node_list[i]]['feature_vector'])
                 x_j = np.array(G.node[node_list[j]]['feature_vector'])
-                # x_i = np.array(graph.node[node_list[i]]['decomp_features'])
-                # x_j = np.array(graph.node[node_list[j]]['decomp_features'])
-            
+
                 elewise_product = np.multiply(x_i, x_j)
                 if W is not None:
                     elewise_product = np.multiply(elewise_product, W)
@@ -100,8 +90,6 @@ class Normality(object):
             
             x_i = np.array(G.node[edge[0]]['feature_vector'])
             x_b = np.array(G.node[edge[1]]['feature_vector'])
-            # x_i = np.array(G.node[edge[0]]['decomp_features'])
-            # x_b = np.array(G.node[edge[1]]['decomp_features'])
             
             elewise_product = np.multiply(x_i, x_b)
             if W is not None:
@@ -118,13 +106,15 @@ class Normality(object):
         x_i = self.internal_consistency(C, W)
         x_e = self.external_separability(G, self.edge_nodes, W)
         # TODO: fix equation to not divide by zero (x_i - x_e) can potentially converge to equal value
+        if x_i - x_e == 0:
+            x_i += 0.00000000001 # As x_i tends upwards during optimization
         return -((x_i - i_min)/(i_max-i_min))+(x_e/(x_i-x_e))
 
     def objective_optimization(self, graph, C):
         adj_m = nx.adjacency_matrix(C)
         length = sum([len(graph.node[x]['feature_vector']) for x in graph.nodes()])/len(graph.nodes())
         I_max = float(len(adj_m.toarray())**2)
-        I_min = calculate_imin(C, adj_m)
+        I_min = self.calculate_imin(C, adj_m)
         initial_vector = np.ones(length)
         # weight vector components are normalised between 0 and 1
         bnds = tuple((0, 1) for x in initial_vector)
@@ -138,13 +128,32 @@ class Normality(object):
             options={"maxiter": 30}
             )
 
-        # print "Imax: %f" % I_max
-        # print "Imin: %f" % I_min
-        # print "weight vector after optimisation: %s" % res.x
-        # print "results after optimisation of weight vector==="
-        # print "Normality: %f" % (self.q(res.x, I_max, I_min, C, graph))
+        print "Imax: %f" % I_max
+        print "Imin: %f" % I_min
+        print "weight vector after optimisation: %s" % res.x
+        print "results after optimisation of weight vector==="
+        print "Normality: %f" % (self.q(res.x, I_max, I_min, C, graph))
         return self.q(res.x, I_max, I_min, C, graph)
 
+#### HELPER FUNCTIONS
+
+    def calculate_imin(self, C, adj_m):
+        node_list = C.nodes()
+        minimum = 0.0
+        for i in range(len(adj_m.toarray())):
+            for j in range(len(adj_m.toarray())):
+                minimum += -(C.degree(node_list[i])*C.degree(node_list[i]))/(2.0*len(C.edges()))
+        return minimum
+
+
+    def find_edge_nodes(self):
+        # TODO: Find a better way of doing this
+        for x in self.subgraph_nodes:
+            for y in x.values():
+                for z in y:
+                    if z not in subgraph:
+                        self.edge_nodes.append((x.keys()[0], z))
+        
 
     def unsuprising_metric(self, k_i, k_b, edges):
         return (1 - min(1, (k_i*k_b)/(2.0*edges)))

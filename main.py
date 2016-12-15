@@ -162,11 +162,11 @@ def main():
         sys.exit()
 
     
-    # for i, edge in enumerate(graphObj.graph.edges()):
-    #     normality = Normality()
-    #     print "Normality %s: %s" % (edge, normality.calculate(graphObj.graph, [edge[0], edge[1]]))
+    for i, edge in enumerate(graphObj.graph.edges()):
+        normality = Normality()
+        print "Normality %s: %s" % (edge, normality.calculate(graphObj.graph, [edge[0], edge[1]]))
     normality = Normality()
-    print normality.calculate(graphObj.graph, [1,2,3])
+    normality.calculate(graphObj.graph, [1,2,3])
 
 if __name__ == "__main__":
     main()
