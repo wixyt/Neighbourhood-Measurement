@@ -161,8 +161,12 @@ def main():
         print "analyse.py file does not exist! %s " % imp_e
         sys.exit()
 
+    
+    # for i, edge in enumerate(graphObj.graph.edges()):
+    #     normality = Normality()
+    #     print "Normality %s: %s" % (edge, normality.calculate(graphObj.graph, [edge[0], edge[1]]))
     normality = Normality()
-    normality.calculate(graphObj.graph, set([0, 1]))
+    print normality.calculate(graphObj.graph, [1,2,3])
 
 if __name__ == "__main__":
     main()
