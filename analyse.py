@@ -10,6 +10,8 @@ import os
 from sklearn.decomposition import PCA
 from networkx.readwrite import json_graph
 
+# TODO: debug edges where subgraph is not connected
+
 class TestingError(Exception):
     """
     Errors for specific problems occuring with the calculation of normality of use of graphs
@@ -30,30 +32,40 @@ class Normality(object):
         self.total_graph = None
         self.subgraph = None # node list
         self.subgraph_nodes = dict
+        self.subgraph_input = [] # for find_edge_nodes
         self.target_node = int
-        self.edge_nodes = []
+        self.boundary_edges = []
 
 
     def calculate(self, total_graph, subgraph, target=None, decompose=None):
         # Ensure total_graph and subgraph is of the right type
-        assert (type(total_graph) == type(nx.Graph()) or type(total_graph) == (nx.DiGraph())), "Total Graph not type of Nx graph"
+        # assert (type(total_graph) == type(nx.Graph()) or type(total_graph) == (nx.DiGraph())), "Total Graph not type of Nx graph"
         assert type(subgraph) == type(list()), "Subgraph not of type list"
         self.total_graph = total_graph
         self.subgraph = total_graph.subgraph(subgraph)
         self.subgraph_nodes = [
             {x: [y for y in nx.all_neighbors(self.total_graph, x)]} for x in subgraph
         ]
+        
+        self.find_boundary_edges(subgraph)
+        # self.internal_boundary_nodes = self.find_internal_boundary_nodes(self.edge_nodes)
+        
         if decompose is not None:
             self.decomposition(self.total_graph)
 
-        I = self.internal_consistency(self.subgraph)
-        E = self.external_separability(self.total_graph, self.edge_nodes)
-        N = I - E
-        print self.objective_optimization(self.total_graph, self.subgraph)
-        return N
+        return self.objective_optimization(self.total_graph, self.subgraph, False)
+        
 
+    def find_internal_boundary_nodes(self, edge_nodes):
+        boundary_nodes = []
+        C = set(self.subgraph.nodes())
+        for edge in self.edge_nodes:
+            for node in edge:
+                if node in C:
+                    boundary_nodes.append(node)
+        return set(boundary_nodes)
     
-    def internal_consistency(self, G, W=None):
+    def internal_consistency(self, G):
         node_list = G.nodes()
         internal_consistency = 0.0
         adj_m = nx.adj_matrix(G, node_list).toarray()
@@ -70,17 +82,16 @@ class Normality(object):
                 x_j = np.array(G.node[node_list[j]]['feature_vector'])
 
                 elewise_product = np.multiply(x_i, x_j)
-                if W is not None:
-                    elewise_product = np.multiply(elewise_product, W)
+                # if W is not None:
+                #     elewise_product = np.multiply(elewise_product, W)
                 total = np.multiply(elewise_product, suprise_index)
                 internal_consistency += np.sum(total)
         
         return internal_consistency
 
-    def external_separability(self, G, E, W=None):
+    def external_separability(self, G, E):
         external_separability = 0.0 
         # ideally it should be low for high quality neighbourhood
-
         for edge in E:
             unsup_metric = self.unsuprising_metric(
                 G.degree(edge[0]), 
@@ -92,48 +103,59 @@ class Normality(object):
             x_b = np.array(G.node[edge[1]]['feature_vector'])
             
             elewise_product = np.multiply(x_i, x_b)
-            if W is not None:
-                elewise_product = np.multiply(elewise_product, W)
+            # if W is not None:
+            #     elewise_product = np.multiply(elewise_product, W)
             total = np.multiply(elewise_product, unsup_metric)
             external_separability += np.sum(total)
 
         return external_separability
 
 
-    def q(self, W, i_max, i_min, C, G):
-        # x_e is the summation product of external_separability using the weight vector
-        # x_i is the summation product of internal_consistency using the weight vector
-        x_i = self.internal_consistency(C, W)
-        x_e = self.external_separability(G, self.edge_nodes, W)
-        # TODO: fix equation to not divide by zero (x_i - x_e) can potentially converge to equal value
-        if x_i - x_e == 0:
-            x_i += 0.00000000001 # As x_i tends upwards during optimization
-        return -((x_i - i_min)/(i_max-i_min))+(x_e/(x_i-x_e))
+    def q(self, i_max, i_min, C, G):
+        # x_e is the summation product of external_separability 
+        # x_i is the summation product of internal_consistency 
+        # x_ei is the summation product of the internal separability 
+        x_i = self.internal_consistency(C)
+        x_ei = self.external_separability(G, C.edges())
+        # print "XI: %f" % x_i
+        # print "X~I: %f " % x_ei
+        # print "Edge nodes: %s" % self.edge_nodes
+        x_e = self.external_separability(G, self.boundary_edges)
+        # print "XE: %f " % x_e
+        print "Xi Summation: %f" % ((x_i - i_min)/(i_max-i_min))
+        print "Xe Summation: %f" % (1-(x_e/(x_ei-x_e)))
+        return  (x_i - i_min)/(i_max-i_min)+(1-(x_e/(x_ei-x_e)))
 
-    def objective_optimization(self, graph, C):
+    def objective_optimization(self, graph, C, optimise=False):
         adj_m = nx.adjacency_matrix(C)
         length = sum([len(graph.node[x]['feature_vector']) for x in graph.nodes()])/len(graph.nodes())
         I_max = float(len(adj_m.toarray())**2)
         I_min = self.calculate_imin(C, adj_m)
-        initial_vector = np.ones(length)
-        # weight vector components are normalised between 0 and 1
-        bnds = tuple((0, 1) for x in initial_vector)
         
-        res = sp.optimize.minimize(
-            self.q, # function 
-            initial_vector, # weight vector 
-            args=(I_max, I_min, C, graph, ), # other parameters to be passed in as arguments to the function
-            method='L-BFGS-B',
-            bounds=bnds, # bounds of the weight vector
-            options={"maxiter": 30}
-            )
+        # weight vector components are normalised between 0 and 1
+        
+        if optimise:
+            print "in optimise for some reason"
+            # initial_vector = np.ones(length)
+            # res = sp.optimize.minimize(
+            #     self.q, # function 
+            #     intial_vector, # weight vector 
+            #     args=(I_max, I_min, C, graph, ), # other parameters to be passed in as arguments to the function
+            #     method='L-BFGS-B',
+            #     bounds=tuple((0, 1) for x in initial_vector), # bounds of the weight vector
+            #     options={"maxiter": 5}
+            # )
+            # res = self.q(res.x, I_max, I_min, C, graph, True) 
 
-        print "Imax: %f" % I_max
+        else:
+            res = self.q(I_max, I_min, C, graph)
+
+        # print "Imax: %f" % I_max
         print "Imin: %f" % I_min
-        print "weight vector after optimisation: %s" % res.x
-        print "results after optimisation of weight vector==="
-        print "Normality: %f" % (self.q(res.x, I_max, I_min, C, graph))
-        return self.q(res.x, I_max, I_min, C, graph)
+        # print "weight vector after optimisation: %s" % res.x
+        # print "results after optimisation of weight vector==="
+        # print "Normality: %f" % (self.q(res.x, I_max, I_min, C, graph))
+        return res
 
 #### HELPER FUNCTIONS
 
@@ -142,17 +164,20 @@ class Normality(object):
         minimum = 0.0
         for i in range(len(adj_m.toarray())):
             for j in range(len(adj_m.toarray())):
-                minimum += -(C.degree(node_list[i])*C.degree(node_list[i]))/(2.0*len(C.edges()))
-        return minimum
+                minimum += (\
+                    self.total_graph.degree(node_list[i])*self.total_graph.degree(node_list[j]))\
+                    /(2.0*self.total_graph.size()\
+                )
+        return -minimum
 
 
-    def find_edge_nodes(self):
+    def find_boundary_edges(self, subgraph_input):
         # TODO: Find a better way of doing this
         for x in self.subgraph_nodes:
             for y in x.values():
                 for z in y:
-                    if z not in subgraph:
-                        self.edge_nodes.append((x.keys()[0], z))
+                    if z not in subgraph_input:
+                        self.boundary_edges.append((x.keys()[0], z))
         
 
     def unsuprising_metric(self, k_i, k_b, edges):
