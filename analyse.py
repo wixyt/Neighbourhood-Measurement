@@ -15,16 +15,16 @@ from networkx.readwrite import json_graph
 class TestingError(Exception):
     """
     Errors for specific problems occuring with the calculation of normality of use of graphs
-    TODO change name 
+    TODO change name
     """
 
 class Normality(object):
     """
-        Class for calculating normality of a given subset of nodes and associated edge nodes    
+        Class for calculating normality of a given subset of nodes and associated edge nodes
     """
     def __init__(self):
         """
-            params: 
+            params:
             total-graph: surrounding graph structure set
             subgraph: subset of total graph
             target: used for evaluation of normality of adding additional node to the subset
@@ -46,15 +46,15 @@ class Normality(object):
         self.subgraph_nodes = [
             {x: [y for y in nx.all_neighbors(self.total_graph, x)]} for x in subgraph
         ]
-        
+
         self.find_boundary_edges(subgraph)
         # self.internal_boundary_nodes = self.find_internal_boundary_nodes(self.edge_nodes)
-        
+
         if decompose is not None:
             self.decomposition(self.total_graph)
 
         return self.objective_optimization(self.total_graph, self.subgraph, False)
-        
+
 
     def find_internal_boundary_nodes(self, edge_nodes):
         boundary_nodes = []
@@ -64,19 +64,19 @@ class Normality(object):
                 if node in C:
                     boundary_nodes.append(node)
         return set(boundary_nodes)
-    
+
     def internal_consistency(self, G):
         node_list = G.nodes()
         internal_consistency = 0.0
         adj_m = nx.adj_matrix(G, node_list).toarray()
         length = (adj_m.shape)[1]
         total_edges = G.size()
-        
+
         for i in range(length):
             for j in range(length):
                 # get index for the "suprise value" between two nodes
                 suprise_index = adj_m[i][j] - \
-                (G.degree(node_list[i])*G.degree(node_list[j]))/(2.0*total_edges)
+                (G.degree(node_list[i])*G.degree(node_list[j]))/(2.0* self.total_graph.size())
 
                 x_i = np.array(G.node[node_list[i]]['feature_vector'])
                 x_j = np.array(G.node[node_list[j]]['feature_vector'])
@@ -86,22 +86,22 @@ class Normality(object):
                 #     elewise_product = np.multiply(elewise_product, W)
                 total = np.multiply(elewise_product, suprise_index)
                 internal_consistency += np.sum(total)
-        
+
         return internal_consistency
 
     def external_separability(self, G, E):
-        external_separability = 0.0 
+        external_separability = 0.0
         # ideally it should be low for high quality neighbourhood
         for edge in E:
             unsup_metric = self.unsuprising_metric(
-                G.degree(edge[0]), 
+                G.degree(edge[0]),
                 G.degree(edge[1]),
                 G.size()
             )
-            
+
             x_i = np.array(G.node[edge[0]]['feature_vector'])
             x_b = np.array(G.node[edge[1]]['feature_vector'])
-            
+
             elewise_product = np.multiply(x_i, x_b)
             # if W is not None:
             #     elewise_product = np.multiply(elewise_product, W)
@@ -112,9 +112,9 @@ class Normality(object):
 
 
     def q(self, i_max, i_min, C, G):
-        # x_e is the summation product of external_separability 
-        # x_i is the summation product of internal_consistency 
-        # x_ei is the summation product of the internal separability 
+        # x_e is the summation product of external_separability
+        # x_i is the summation product of internal_consistency
+        # x_ei is the summation product of the internal separability
         x_i = self.internal_consistency(C)
         x_ei = self.external_separability(G, C.edges())
         # print "XI: %f" % x_i
@@ -124,31 +124,31 @@ class Normality(object):
         # print "XE: %f " % x_e
         print "Xi Summation: %f" % ((x_i - i_min)/(i_max-i_min))
         print "Xe Summation: %f" % (1-(x_e/(x_ei-x_e)))
-        return  (x_i - i_min)/(i_max-i_min)+(1-(x_e/(x_ei-x_e)))
+        return (x_i - i_min)/(i_max-i_min)+(1-(x_e/(x_ei-x_e)))
 
     def objective_optimization(self, graph, C, optimise=False):
         adj_m = nx.adjacency_matrix(C)
         length = sum([len(graph.node[x]['feature_vector']) for x in graph.nodes()])/len(graph.nodes())
         I_max = float(len(adj_m.toarray())**2)
         I_min = self.calculate_imin(C, adj_m)
-        
+
         # weight vector components are normalised between 0 and 1
-        
+
         if optimise:
             print "in optimise for some reason"
             # initial_vector = np.ones(length)
             # res = sp.optimize.minimize(
-            #     self.q, # function 
-            #     intial_vector, # weight vector 
+            #     self.q, # function
+            #     intial_vector, # weight vector
             #     args=(I_max, I_min, C, graph, ), # other parameters to be passed in as arguments to the function
             #     method='L-BFGS-B',
             #     bounds=tuple((0, 1) for x in initial_vector), # bounds of the weight vector
             #     options={"maxiter": 5}
             # )
-            # res = self.q(res.x, I_max, I_min, C, graph, True) 
+            # res = self.q(res.x, I_max, I_min, C, graph, True)
 
         else:
-            res = self.q(I_max, I_min, C, graph)
+            res = -1 * self.q(I_max, I_min, C, graph)
 
         # print "Imax: %f" % I_max
         print "Imin: %f" % I_min
@@ -178,14 +178,14 @@ class Normality(object):
                 for z in y:
                     if z not in subgraph_input:
                         self.boundary_edges.append((x.keys()[0], z))
-        
+
 
     def unsuprising_metric(self, k_i, k_b, edges):
         return (1 - min(1, (k_i*k_b)/(2.0*edges)))
 
-    
+
     def decomposition(self, graph):
-        # using PCA decompose the feature vectors into a smaller feature matrix 
+        # using PCA decompose the feature vectors into a smaller feature matrix
         pca = PCA(n_components=4)
         feature_matrix = []
         for node in graph.nodes():
@@ -201,7 +201,7 @@ class Normality(object):
 # def adjancency_array(graph, node_list):
 #     return nx.adj_matrix(graph, node_list).toarray()
 
-# def hadamard_product(a, b): 
+# def hadamard_product(a, b):
 #     # practically an XOR on arrays with units of 0 and 1
 #     return np.multiply(a, b)
 
@@ -211,8 +211,8 @@ class Normality(object):
 #     adj_m = adjancency_array(graph, node_list)
 #     length = (adj_m.shape)[1]
 #     total_edges = graph.size()
-    
-    
+
+
 #     for i in range(length):
 #         for j in range(length):
 #             # get index for the "suprise value" between two nodes
@@ -228,14 +228,14 @@ class Normality(object):
 #             # x_j = np.array(graph.node[node_list[j]]['feature_vector'])
 #             x_i = np.array(graph.node[node_list[i]]['decomp_features'])
 #             x_j = np.array(graph.node[node_list[j]]['decomp_features'])
-        
+
 #             elewise_product = hadamard_product(x_i, x_j)
 #             if w_i is not None:
 #                 elewise_product = np.multiply(elewise_product, w_i)
 #             total = np.multiply(elewise_product, suprise_index)
-            
+
 #             internal_consistency += np.sum(total)
-    
+
 #     return internal_consistency
 
 # def boundary_edges(G):
@@ -244,34 +244,34 @@ class Normality(object):
 #         if G.node[edge[0]]['subgraphs'] != G.node[edge[1]]['subgraphs']:
 #             E_list.append(edge)
 #     return E_list
-    
+
 
 # def external_separability(G, E, w_e=None):
-#     external_separability = 0.0 
+#     external_separability = 0.0
 #     # ideally it should be low for high quality neighbourhood
 
 #     for edge in E:
 #         unsup_metric = unsuprising_metric(
-#             G.degree(edge[0]), 
-#             G.degree(edge[1]), 
+#             G.degree(edge[0]),
+#             G.degree(edge[1]),
 #             len(G.edges())
 #         )
 #         # x_i = np.array(G.node[edge[0]]['feature_vector'])
 #         # x_b = np.array(G.node[edge[1]]['feature_vector'])
 #         x_i = np.array(G.node[edge[0]]['decomp_features'])
 #         x_b = np.array(G.node[edge[1]]['decomp_features'])
-        
+
 #         elewise_product = hadamard_product(x_i, x_b)
 #         if w_e is not None:
 #             elewise_product = np.multiply(elewise_product, w_e)
 #         total = np.multiply(elewise_product, unsup_metric)
-        
+
 #         external_separability += np.sum(total)
 
 
 #     return external_separability
 
-# def cluster_by_degree(graph): 
+# def cluster_by_degree(graph):
 #     # VERY BAD WAY OF CLUSTERING
 #     total_degree = 0
 #     nodes = 0
@@ -290,7 +290,7 @@ class Normality(object):
 # def subgraph_separate(graph):
 #     subgraphs = []
 #     count = 0
-#     remaining_subgraphs = True 
+#     remaining_subgraphs = True
 #     while remaining_subgraphs:
 #         subgraph_nodes = []
 #         for node in graph.nodes():
@@ -339,12 +339,12 @@ class Normality(object):
 #     x_e = np.ones(length)
 #     # weight vector components are normalised between 0 and 1
 #     bnds = tuple((0, 1) for x in x_i)
-    
-    
+
+
 #     # res = sp.optimize.minimize(fun=optimize, method='BFGS', jac=True, args=(x_i, C, graph), options={"maxiter": 5000}, bounds=bounds)
 #     res = sp.optimize.minimize(
-#         optimize, # function 
-#         [x_i, x_e], # weight vector 
+#         optimize, # function
+#         [x_i, x_e], # weight vector
 #         args=(C, graph, I_max, ), # other parameters to be passed in as arguments to the function
 #         method='L-BFGS-B',
 #         bounds=bnds, # bounds of the weight vector
@@ -355,7 +355,7 @@ class Normality(object):
 #     print "Normality: %f" % (optimize(res.x, C, graph, I_max))
 
 # def decomposition(graph):
-#     # using PCA decompose the feature vectors into a smaller feature matrix 
+#     # using PCA decompose the feature vectors into a smaller feature matrix
 #     pca = PCA(n_components=4)
 #     feature_matrix = []
 #     for node in graph.nodes():
@@ -363,7 +363,7 @@ class Normality(object):
 #     sk_transf = pca.fit_transform(np.array(feature_matrix))
 #     print sk_transf
 #     for i, node in enumerate(graph.nodes()):
-#         graph.node[node]['decomp_features'] = sk_transf[i]  
+#         graph.node[node]['decomp_features'] = sk_transf[i]
 
 
 # def operations(graph):
@@ -371,23 +371,23 @@ class Normality(object):
 #     subgraphs = subgraph_separate(graph)
 #     count = 1
 #     for subgraph in subgraphs:
-#         print "subgraph: %d" % count 
+#         print "subgraph: %d" % count
 #         calculate_normality(subgraph, graph)
 #         count += 1
 
 # def main(args):
 #     # TODO: add argument parser
-#     # ARGUMENTS 
+#     # ARGUMENTS
 #     # -[l|c] data_directory {--directed} {--pickle|--json}
 #     # -l load from graph file like JSON or PICKLE
-#     # -c Create graph from data files (edges, features, etc) 
-#     # --directed 
+#     # -c Create graph from data files (edges, features, etc)
+#     # --directed
 
 #     if len(args) < 4:
-#         print("""Invalid arguments EXITING \n ARGUMENTS 
+#         print("""Invalid arguments EXITING \n ARGUMENTS
 #     # -[l|c] data_directory {--directed} {--pickle|--json}
 #     # -l load from graph file like JSON or PICKLE
-#     # -c Create graph from data files (edges, features, etc) 
+#     # -c Create graph from data files (edges, features, etc)
 #     # --directed """
 #     )
 #         sys.exit()
@@ -399,20 +399,20 @@ class Normality(object):
 #             graph = nx.read_gpickle(graph_file)
 #         elif args[3] == '--json':
 #             graph = read_json_file(graph_file)
-            
-    
+
+
 #     elif args[1] == '-c':
 #         if args[3] == '--directed':
 #             graph = wrapper(args[2], "directed")
 #         else:
 #             graph = wrapper(args[2])
-    
-    
-        
+
+
+
 #     else:
 #         print("No valid arguments given")
 #     print "Graph size: %d" % graph.size()
 #     operations(graph)
-    
+
 # if __name__ == "__main__":
 #     main(sys.argv)
