@@ -65,6 +65,9 @@ class Normality(object):
                     boundary_nodes.append(node)
         return set(boundary_nodes)
 
+    def createWeightVector(self, feature_vectors):
+        pass
+
     def internal_consistency(self, G):
         node_list = G.nodes()
         internal_consistency = 0.0
