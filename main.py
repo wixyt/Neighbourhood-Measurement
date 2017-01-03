@@ -8,7 +8,7 @@ def parse_arguments():
     parser = argparse.ArgumentParser(description='Normality Test Program')
     parser.add_argument( '-d', '--data', type = str , help = 'path to data folder for graph construction')
     parser.add_argument('-b', '--bigraph', default = False, help = 'Bigraph (directed) edges')
-    
+
     args = parser.parse_args()
 
     return args
@@ -37,7 +37,7 @@ def test_load_module(module):
     except AttributeError:
         print "Graph loader does not exist"
         raise TestingError()
-    
+
     try:
         graph_loader = module.GraphLoader()
     except Exception as e:
@@ -60,7 +60,7 @@ def test_load_module(module):
         except Exception as e:
             print "Unexpected error: %s" % e
             raise TestingError()
-        
+
         try:
             if hasattr(module.GraphLoader, 'path'):
                 print "'path' is a class variable and does not belong to the instance"
@@ -87,11 +87,11 @@ def test_load_module(module):
     except AttributeError:
         print "load files does not exist!"
         raise TestingError()
-    
+
     test_load = module.GraphLoader()
     test_load.load_files(['testdata/', False])
 
-    try: 
+    try:
         import networkx as nx
     except ImportError:
         print "error importing networkx library, make sure this is installed"
@@ -142,7 +142,7 @@ def main():
     except ImportError:
         print("load.py file does not exist")
         sys.exit()
-    
+
     if args.data:
         try:
             test_load_module(load)
@@ -151,11 +151,11 @@ def main():
 
     graphObj = load.GraphLoader()
     graphObj.load_files([args.data, args.bigraph])
-    
+
     print "Size of graph: %d" % graphObj.graph.size()
     print "Number of nodes: %d" % len(graphObj.graph.nodes())
     print "Size of feature vector: %d" % len(graphObj.graph.node[graphObj.graph.nodes()[0]]['feature_vector'])
-    
+
     try:
         from analyse import Normality
     except ImportError as imp_e:
@@ -165,6 +165,9 @@ def main():
     f = open('ouput.txt', 'w')
     for i, edge in enumerate(graphObj.graph.edges()):
         normality = Normality()
+        print "=" * 5 + "\n"
+        print "Subgraph: ", edge
+
         f.write("%s:%s\n" % (edge, normality.calculate(graphObj.graph, [edge[0], edge[1]])))
         # print "Normality %s: %s" % (edge, normality.calculate(graphObj.graph, [edge[0], edge[1]]))
     f.close()

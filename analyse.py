@@ -47,6 +47,7 @@ class Normality(object):
             {x: [y for y in nx.all_neighbors(self.total_graph, x)]} for x in subgraph
         ]
 
+
         self.find_boundary_edges(subgraph)
         # self.internal_boundary_nodes = self.find_internal_boundary_nodes(self.edge_nodes)
 
@@ -120,14 +121,10 @@ class Normality(object):
         # x_ei is the summation product of the internal separability
         x_i = self.internal_consistency(C)
         x_ei = self.external_separability(G, C.edges())
-        # print "XI: %f" % x_i
-        # print "X~I: %f " % x_ei
-        # print "Edge nodes: %s" % self.edge_nodes
         x_e = self.external_separability(G, self.boundary_edges)
-        # print "XE: %f " % x_e
         print "Xi Summation: %f" % ((x_i - i_min)/(i_max-i_min))
-        print "Xe Summation: %f" % (1-(x_e/(x_ei-x_e)))
-        return (x_i - i_min)/(i_max-i_min)+(1-(x_e/(x_ei-x_e)))
+        print "Xe Summation: %f" % (x_e/(x_ei-x_e))
+        return 1 - ((x_i)/(i_max-i_min)) + (x_e/(x_ei-x_e))
 
     def objective_optimization(self, graph, C, optimise=False):
         adj_m = nx.adjacency_matrix(C)
@@ -138,7 +135,7 @@ class Normality(object):
         # weight vector components are normalised between 0 and 1
 
         if optimise:
-            print "in optimise for some reason"
+            print "WARNING: Optimisation functions should not occur"
             # initial_vector = np.ones(length)
             # res = sp.optimize.minimize(
             #     self.q, # function
@@ -151,13 +148,12 @@ class Normality(object):
             # res = self.q(res.x, I_max, I_min, C, graph, True)
 
         else:
-            res = -1 * self.q(I_max, I_min, C, graph)
+            res = -self.q(I_max, I_min, C, graph)
 
         # print "Imax: %f" % I_max
-        print "Imin: %f" % I_min
         # print "weight vector after optimisation: %s" % res.x
         # print "results after optimisation of weight vector==="
-        # print "Normality: %f" % (self.q(res.x, I_max, I_min, C, graph))
+        print "Normality: %f" % res
         return res
 
 #### HELPER FUNCTIONS
