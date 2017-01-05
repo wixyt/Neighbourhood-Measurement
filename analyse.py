@@ -46,7 +46,9 @@ class Normality(object):
         self.subgraph_nodes = [
             {x: [y for y in nx.all_neighbors(self.total_graph, x)]} for x in subgraph
         ]
-
+        self.feature_vectors = [self.total_graph.node[x]['feature_vector'] for x in self.total_graph.nodes()]
+        # TODO: attach weight vector to graph object class
+        self.weight_vector = self.create_weight_vector(self.feature_vectors)
 
         self.find_boundary_edges(subgraph)
         # self.internal_boundary_nodes = self.find_internal_boundary_nodes(self.edge_nodes)
@@ -66,8 +68,45 @@ class Normality(object):
                     boundary_nodes.append(node)
         return set(boundary_nodes)
 
-    def createWeightVector(self, feature_vectors):
-        pass
+
+
+    def create_weight_vector(self, feature_vectors):
+        import math
+        feature_distribution = {}
+        for vector in feature_vectors:
+            for i in range(len(vector)):
+                if i not in feature_distribution:
+                    feature_distribution[i] = 0
+                if vector[i] > 0:
+                    feature_distribution[i] += 1
+        total = 0
+        for v in feature_distribution.keys():
+            total += feature_distribution[v]
+        weight_vector = {}
+        for key in feature_distribution.keys():
+            weight_vector[key] = abs(math.log((feature_distribution[key] / (total * 1.0))))
+        return weight_vector
+
+    def features_to_dict(self, fv):
+        feature_dict = {}
+        for i in range(len(fv)):
+            if fv[i] > 0:
+                feature_dict[i] = fv[i]
+        return feature_dict
+
+    def weighted_jaccard(self, w_v, fv_a, fv_b):
+        # return |sum of fv1_i in fv2_i * w_v_i| / |sum of fv1_i U fv2_i * w_v_i|
+        numerator = 0.0
+        for i in range(len(fv_a)):
+            if fv_a[i] == fv_b[i]:
+                numerator += w_v[i]
+        denominator = 0.0
+        for i in range(len(fv_a)):
+            if fv_a[i] == 1 or fv_b[i] == 1:
+                denominator += w_v[i]
+
+        print "num: %f & denominator: %f" % (numerator, denominator)
+        return numerator / denominator
 
     def internal_consistency(self, G):
         node_list = G.nodes()
@@ -82,13 +121,14 @@ class Normality(object):
                 suprise_index = adj_m[i][j] - \
                 (G.degree(node_list[i])*G.degree(node_list[j]))/(2.0* self.total_graph.size())
 
-                x_i = np.array(G.node[node_list[i]]['feature_vector'])
-                x_j = np.array(G.node[node_list[j]]['feature_vector'])
+                x_i = G.node[node_list[i]]['feature_vector']
+                x_j = G.node[node_list[j]]['feature_vector']
 
-                elewise_product = np.multiply(x_i, x_j)
+                # elewise_product = np.multiply(x_i, x_j)
+
                 # if W is not None:
                 #     elewise_product = np.multiply(elewise_product, W)
-                total = np.multiply(elewise_product, suprise_index)
+                total = np.multiply(self.weighted_jaccard(self.weight_vector, x_i, x_j), suprise_index)
                 internal_consistency += np.sum(total)
 
         return internal_consistency
@@ -148,9 +188,10 @@ class Normality(object):
             # res = self.q(res.x, I_max, I_min, C, graph, True)
 
         else:
-            res = -self.q(I_max, I_min, C, graph)
+            res = - self.q(I_max, I_min, C, graph)
 
-        # print "Imax: %f" % I_max
+        print "Imax: %f" % I_max
+        print "Imin: %f" % I_min
         # print "weight vector after optimisation: %s" % res.x
         # print "results after optimisation of weight vector==="
         print "Normality: %f" % res
