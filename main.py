@@ -150,7 +150,10 @@ def main():
             pass
 
     graphObj = load.GraphLoader()
-    graphObj.load_files([args.data, args.bigraph])
+    if args.data:
+        graphObj.load_files([args.data, args.bigraph])
+    else:
+        graphObj.generate_random(12, 14, 10)
 
     print "Size of graph: %d" % graphObj.graph.size()
     print "Number of nodes: %d" % len(graphObj.graph.nodes())
@@ -162,15 +165,32 @@ def main():
         print "analyse.py file does not exist! %s " % imp_e
         sys.exit()
 
-    f = open('ouput.txt', 'w')
-    for i, edge in enumerate(graphObj.graph.edges()):
-        normality = Normality()
-        print "=" * 5 + "\n"
-        print "Subgraph: ", edge
+    # f = open('ouput.txt', 'w')
+    # for i, edge in enumerate(graphObj.graph.edges()):
+    #     normality = Normality()
+    #     print "=" * 5 + "\n"
+    #     print "Subgraph: ", edge
 
-        f.write("%s:%s\n" % (edge, normality.calculate(graphObj.graph, [edge[0], edge[1]])))
-        # print "Normality %s: %s" % (edge, normality.calculate(graphObj.graph, [edge[0], edge[1]]))
-    f.close()
+    #     f.write("%s:%s\n" % (edge, normality.calculate(graphObj.graph, [edge[0], edge[1]])))
+    #     # print "Normality %s: %s" % (edge, normality.calculate(graphObj.graph, [edge[0], edge[1]]))
+    # f.close()
+
+    try:
+        import search
+    except ImportError:
+        print("search.py file does not exist")
+        sys.exit()
+    
+
+    clusters = search.IncrementalCluster()
+
+    for node in graphObj.graph.nodes():
+        clusters.AddNode(node, graphObj.graph)
+    
+    for cluster in clusters.cluster_sets:
+        print cluster['cluster_number']
+        for node_info in cluster['node_maps']:
+            print node_info        
 
 if __name__ == "__main__":
     main()

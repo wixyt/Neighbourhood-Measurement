@@ -29,7 +29,23 @@ class GraphLoader(object):
         except IOError:
             print "error reading JSON graph file"
             return False
-            
+    
+    def generate_random(self, node_number, size, attribute_vector_size):
+        import random
+        self.graph = nx.Graph()
+        self.graph.add_nodes_from(range(0, node_number))
+        while len(self.graph.edges()) < size:
+            n1 = random.randrange(0, node_number, 1)
+            n2 = random.randrange(0, node_number, 1)
+            if n1 != n2:
+                self.graph.add_edge(n1, n2)
+        for node in self.graph.nodes():
+            attr_vec = []
+            for i in range(attribute_vector_size):
+                attr_vec.append(random.randint(0, 1))
+            self.graph.node[node]['feature_vector'] = attr_vec
+        return True
+
 
     def save(self, path):
         try: 

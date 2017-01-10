@@ -77,14 +77,14 @@ class Normality(object):
             for i in range(len(vector)):
                 if i not in feature_distribution:
                     feature_distribution[i] = 0
-                if vector[i] > 0:
+                if vector[i] == 1:
                     feature_distribution[i] += 1
         total = 0
         for v in feature_distribution.keys():
             total += feature_distribution[v]
         weight_vector = {}
         for key in feature_distribution.keys():
-            weight_vector[key] = abs(math.log((feature_distribution[key] / (total * 1.0))))
+            weight_vector[key] = abs(math.log(((total * 1.0) / feature_distribution[key] + 1.0)))
         return weight_vector
 
     def features_to_dict(self, fv):
@@ -97,16 +97,19 @@ class Normality(object):
     def weighted_jaccard(self, w_v, fv_a, fv_b):
         # return |sum of fv1_i in fv2_i * w_v_i| / |sum of fv1_i U fv2_i * w_v_i|
         numerator = 0.0
+        denominator = 0.0
         for i in range(len(fv_a)):
             if fv_a[i] == fv_b[i]:
                 numerator += w_v[i]
-        denominator = 0.0
-        for i in range(len(fv_a)):
-            if fv_a[i] == 1 or fv_b[i] == 1:
                 denominator += w_v[i]
-
-        print "num: %f & denominator: %f" % (numerator, denominator)
-        return numerator / denominator
+            if fv_a[i] == 1:
+                denominator += w_v[i]
+            if fv_b[i] == 1:
+                denominator += w_v[i]
+        if numerator > denominator:
+            "SOMETHING WENT WRONG: NUMERATOR > denominator"
+        # print "num: %f & denominator: %f" % (numerator, denominator)
+        return (numerator / denominator)
 
     def internal_consistency(self, G):
         node_list = G.nodes()
@@ -162,8 +165,8 @@ class Normality(object):
         x_i = self.internal_consistency(C)
         x_ei = self.external_separability(G, C.edges())
         x_e = self.external_separability(G, self.boundary_edges)
-        print "Xi Summation: %f" % ((x_i - i_min)/(i_max-i_min))
-        print "Xe Summation: %f" % (x_e/(x_ei-x_e))
+        # print "Xi Summation: %f" % ((x_i - i_min)/(i_max-i_min))
+        # print "Xe Summation: %f" % (x_e/(x_ei-x_e))
         return 1 - ((x_i)/(i_max-i_min)) + (x_e/(x_ei-x_e))
 
     def objective_optimization(self, graph, C, optimise=False):
@@ -190,8 +193,8 @@ class Normality(object):
         else:
             res = - self.q(I_max, I_min, C, graph)
 
-        print "Imax: %f" % I_max
-        print "Imin: %f" % I_min
+        # print "Imax: %f" % I_max
+        # print "Imin: %f" % I_min
         # print "weight vector after optimisation: %s" % res.x
         # print "results after optimisation of weight vector==="
         print "Normality: %f" % res
