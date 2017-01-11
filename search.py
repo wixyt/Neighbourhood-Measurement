@@ -5,11 +5,11 @@ class IncrementalCluster(object):
         self.cluster_sets = []
         # assign arbitary normality
         self.cluster_count = 0
-        self.norm_threshold = 0.8
+        self.norm_threshold = 0.07
 
     def Connections(self, node):
         return node.edges
-        
+
     def AddNode(self, node, graph):
         node_info = {}
         node_info['node'] = node
@@ -26,12 +26,12 @@ class IncrementalCluster(object):
             # attributes: [attribute vector]
         #}
         # find if node is connected to any existing subset, else assign to its own subset
-    
+
         if self.cluster_count == 0:
             cluster = {
                 'cluster_number': self.cluster_count,
                 'nodes': [node['node']],
-                
+
                 'node_maps': [node]
             }
             self.cluster_count += 1
@@ -43,17 +43,16 @@ class IncrementalCluster(object):
 
             for cluster in self.cluster_sets:
                 # if a connect node from node is in cluster set's connected nodes perform compute'
-                for connected_node in node['connected']: 
+                for connected_node in node['connected']:
 
                     if connected_node in set(cluster['nodes']):
                         normality = Normality()
                         normality_value = normality.calculate(graph, ([node['node']] + cluster['nodes']))
-                        
-                        
+
                         if normality_value > highest_value:
                             highest_value = normality_value
                             best_cluster = cluster['cluster_number']
-            if highest_value > self.norm_threshold:
+            if highest_value > 0.50:
                 self.cluster_sets[best_cluster]['nodes'].append(node['node'])
                 self.cluster_sets[best_cluster]['node_maps'].append(node)
             else:
@@ -74,10 +73,7 @@ class IncrementalCluster(object):
             self.cluster_sets.append(cluster)
         # assign to cluster set if cluster set is empty
 
-        
+
         # calculate normality score with relevant subsets
 
         # assign node to relevant subset or create new subset consisting of node based on threshold
-
-
-

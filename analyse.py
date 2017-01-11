@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import scipy as sp
 import json
 import os
-from sklearn.decomposition import PCA
+# from sklearn.decomposition import PCA
 from networkx.readwrite import json_graph
 
 # TODO: debug edges where subgraph is not connected
@@ -152,7 +152,7 @@ class Normality(object):
             elewise_product = np.multiply(x_i, x_b)
             # if W is not None:
             #     elewise_product = np.multiply(elewise_product, W)
-            total = np.multiply(elewise_product, unsup_metric)
+            total = np.multiply(self.weighted_jaccard(self.weight_vector, x_i, x_b), unsup_metric)
             external_separability += np.sum(total)
 
         return external_separability
@@ -165,9 +165,10 @@ class Normality(object):
         x_i = self.internal_consistency(C)
         x_ei = self.external_separability(G, C.edges())
         x_e = self.external_separability(G, self.boundary_edges)
-        # print "Xi Summation: %f" % ((x_i - i_min)/(i_max-i_min))
-        # print "Xe Summation: %f" % (x_e/(x_ei-x_e))
-        return 1 - ((x_i)/(i_max-i_min)) + (x_e/(x_ei-x_e))
+        print "xE = %f" % x_e
+        print "xi = %f" % x_i
+        # return ((x_i)/(i_max - i_min)) + (x_e /(x_ei - x_e))
+        return 1/(((1 - x_i) + (1 - x_e)) * len(C.nodes()))
 
     def objective_optimization(self, graph, C, optimise=False):
         adj_m = nx.adjacency_matrix(C)
@@ -191,7 +192,7 @@ class Normality(object):
             # res = self.q(res.x, I_max, I_min, C, graph, True)
 
         else:
-            res = - self.q(I_max, I_min, C, graph)
+            res =  self.q(I_max, I_min, C, graph)
 
         # print "Imax: %f" % I_max
         # print "Imin: %f" % I_min
@@ -207,11 +208,11 @@ class Normality(object):
         minimum = 0.0
         for i in range(len(adj_m.toarray())):
             for j in range(len(adj_m.toarray())):
-                minimum += (\
+                minimum -= (\
                     self.total_graph.degree(node_list[i])*self.total_graph.degree(node_list[j]))\
                     /(2.0*self.total_graph.size()\
                 )
-        return -minimum
+        return minimum
 
 
     def find_boundary_edges(self, subgraph_input):

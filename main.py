@@ -166,13 +166,13 @@ def main():
         sys.exit()
 
     # f = open('ouput.txt', 'w')
-    # for i, edge in enumerate(graphObj.graph.edges()):
-    #     normality = Normality()
-    #     print "=" * 5 + "\n"
-    #     print "Subgraph: ", edge
+    for i, edge in enumerate(graphObj.graph.edges()):
+        normality = Normality()
+        print "=" * 5 + "\n"
+        print "Subgraph: ", edge
 
-    #     f.write("%s:%s\n" % (edge, normality.calculate(graphObj.graph, [edge[0], edge[1]])))
-    #     # print "Normality %s: %s" % (edge, normality.calculate(graphObj.graph, [edge[0], edge[1]]))
+        # f.write("%s:%s\n" % (edge, normality.calculate(graphObj.graph, [edge[0], edge[1]])))
+        print "Normality %s: %s" % (edge, normality.calculate(graphObj.graph, [edge[0], edge[1]]))
     # f.close()
 
     try:
@@ -180,17 +180,17 @@ def main():
     except ImportError:
         print("search.py file does not exist")
         sys.exit()
-    
+
 
     clusters = search.IncrementalCluster()
 
     for node in graphObj.graph.nodes():
         clusters.AddNode(node, graphObj.graph)
-    
+
     for cluster in clusters.cluster_sets:
         print cluster['cluster_number']
         for node_info in cluster['node_maps']:
-            print node_info        
+            print node_info
 
 if __name__ == "__main__":
     main()
