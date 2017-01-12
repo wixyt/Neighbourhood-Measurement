@@ -97,19 +97,19 @@ class Normality(object):
     def weighted_jaccard(self, w_v, fv_a, fv_b):
         # return |sum of fv1_i in fv2_i * w_v_i| / |sum of fv1_i U fv2_i * w_v_i|
         numerator = 0.0
-        denominator = 0.0
+        # denominator = 0.0
+        # denominator = sum([x for x in w_v.values()])
+
         for i in range(len(fv_a)):
             if fv_a[i] == fv_b[i]:
-                numerator += w_v[i]
-                denominator += w_v[i]
-            if fv_a[i] == 1:
-                denominator += w_v[i]
-            if fv_b[i] == 1:
-                denominator += w_v[i]
-        if numerator > denominator:
-            "SOMETHING WENT WRONG: NUMERATOR > denominator"
-        # print "num: %f & denominator: %f" % (numerator, denominator)
-        return (numerator / denominator)
+                # using non-weighted values
+                numerator += 1.0
+                # denominator += w_v[i]
+            # if fv_a[i] == 1:
+                # denominator += w_v[i]
+            # if fv_b[i] == 1:
+                # denominator += w_v[i]
+        return numerator / len(fv_a)
 
     def internal_consistency(self, G):
         node_list = G.nodes()
@@ -117,7 +117,7 @@ class Normality(object):
         adj_m = nx.adj_matrix(G, node_list).toarray()
         length = (adj_m.shape)[1]
         total_edges = G.size()
-
+        total_weightOfJac = 0.0
         for i in range(length):
             for j in range(length):
                 # get index for the "suprise value" between two nodes
@@ -128,12 +128,10 @@ class Normality(object):
                 x_j = G.node[node_list[j]]['feature_vector']
 
                 # elewise_product = np.multiply(x_i, x_j)
-
                 # if W is not None:
                 #     elewise_product = np.multiply(elewise_product, W)
                 total = np.multiply(self.weighted_jaccard(self.weight_vector, x_i, x_j), suprise_index)
                 internal_consistency += np.sum(total)
-
         return internal_consistency
 
     def external_separability(self, G, E):
@@ -149,7 +147,7 @@ class Normality(object):
             x_i = np.array(G.node[edge[0]]['feature_vector'])
             x_b = np.array(G.node[edge[1]]['feature_vector'])
 
-            elewise_product = np.multiply(x_i, x_b)
+            # elewise_product = np.multiply(x_i, x_b)
             # if W is not None:
             #     elewise_product = np.multiply(elewise_product, W)
             total = np.multiply(self.weighted_jaccard(self.weight_vector, x_i, x_b), unsup_metric)
@@ -162,13 +160,15 @@ class Normality(object):
         # x_e is the summation product of external_separability
         # x_i is the summation product of internal_consistency
         # x_ei is the summation product of the internal separability
-        x_i = self.internal_consistency(C)
-        x_ei = self.external_separability(G, C.edges())
-        x_e = self.external_separability(G, self.boundary_edges)
-        print "xE = %f" % x_e
-        print "xi = %f" % x_i
+        # x_i = self.internal_consistency(C)
+        # x_ei = self.external_separability(G, C.edges())
+        # x_e = self.external_separability(G, self.boundary_edges)
+        i = self.internal_consistency(C) / len(C.nodes()) * 1.0
+        e = self.external_separability(G, self.boundary_edges) / len(C.nodes()) * 1.0
+        # print "ES = %f" % e
+        # print "i - e = %f" % (i - e)
         # return ((x_i)/(i_max - i_min)) + (x_e /(x_ei - x_e))
-        return 1/(((1 - x_i) + (1 - x_e)) * len(C.nodes()))
+        return (i - e)
 
     def objective_optimization(self, graph, C, optimise=False):
         adj_m = nx.adjacency_matrix(C)
@@ -198,7 +198,7 @@ class Normality(object):
         # print "Imin: %f" % I_min
         # print "weight vector after optimisation: %s" % res.x
         # print "results after optimisation of weight vector==="
-        print "Normality: %f" % res
+        # print "Normality: %f" % res
         return res
 
 #### HELPER FUNCTIONS

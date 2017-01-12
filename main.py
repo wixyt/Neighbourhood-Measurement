@@ -172,7 +172,7 @@ def main():
         print "Subgraph: ", edge
 
         # f.write("%s:%s\n" % (edge, normality.calculate(graphObj.graph, [edge[0], edge[1]])))
-        print "Normality %s: %s" % (edge, normality.calculate(graphObj.graph, [edge[0], edge[1]]))
+        print "Normality %s: %f" % (edge, normality.calculate(graphObj.graph, [edge[0], edge[1]]))
     # f.close()
 
     try:
