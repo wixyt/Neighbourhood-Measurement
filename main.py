@@ -115,23 +115,52 @@ def test_load_module(module):
     print "All tests passed"
     print "-" * 40
 
-def breadth_first_search(graph, start_node):
-    marked, queue = set(), [start_node]
-    while queue:
-        vertex = queue.pop(0)
-        if vertex not in marked:
-            marked.add(vertex)
-            queue.extend(graph[vertex] - marked)
-    return marked
 
-def depth_first_search(graph, start_node, marked=None):
-    # Graph = {1: [EDGES], 2: [EDGES], ... }
-    if marked is None:
-        marked = set()
-    marked.add(start_node)
-    for next in graph[start_node] - marked:
-        depth_first_search(graph, next, marked)
-    return marked
+def calculate_graph_normality(graph):
+    """
+        Processes:
+        1. Calculate normality score for each edge - display to user
+        2. Import and assign each node to cluster based on normality score
+    """
+    try:
+        from analyse import Normality
+    except ImportError as imp_e:
+        print "analyse.py file does not exist! %s " % imp_e
+        sys.exit()
+
+    for i, edge in enumerate(graph.edges()):
+        normality = Normality()
+        print "=" * 5 + "\n"
+        print "Subgraph: ", edge
+        print "Normality %s: %f" % (edge, normality.calculate(graph, [edge[0], edge[1]]))
+
+    try:
+        import search
+    except ImportError:
+        print("search.py file does not exist")
+        sys.exit()
+
+    clusters = search.IncrementalCluster()
+
+    for node in graph.nodes():
+        clusters.AddNode(node, graph)
+
+    for cluster in clusters.cluster_sets:
+        print cluster['cluster_number']
+        for node_info in cluster['node_maps']:
+            print node_info
+
+
+def plot(edges):
+    # TODO: implement bar graph for clusters within a graph
+    import matplotlib.pyplot as plt
+    import numpy as np
+    width = 1/1.5
+    plt.bar(np.arange(len(graph.edges())), normality_outputs, width, color="green")
+    plt.xticks(np.arange(len(graph.edges())), graph.edges())
+    plt.ylabel("normality")
+    plt.show()
+
 
 def main():
 
@@ -159,38 +188,14 @@ def main():
     print "Number of nodes: %d" % len(graphObj.graph.nodes())
     print "Size of feature vector: %d" % len(graphObj.graph.node[graphObj.graph.nodes()[0]]['feature_vector'])
 
-    try:
-        from analyse import Normality
-    except ImportError as imp_e:
-        print "analyse.py file does not exist! %s " % imp_e
-        sys.exit()
 
-    # f = open('ouput.txt', 'w')
-    for i, edge in enumerate(graphObj.graph.edges()):
-        normality = Normality()
-        print "=" * 5 + "\n"
-        print "Subgraph: ", edge
+    calculate_graph_normality(graphObj.graph)
 
-        # f.write("%s:%s\n" % (edge, normality.calculate(graphObj.graph, [edge[0], edge[1]])))
-        print "Normality %s: %f" % (edge, normality.calculate(graphObj.graph, [edge[0], edge[1]]))
-    # f.close()
-
-    try:
-        import search
-    except ImportError:
-        print("search.py file does not exist")
-        sys.exit()
+    #Matplot Lib:
+    # plot(graphObj.graph)
 
 
-    clusters = search.IncrementalCluster()
 
-    for node in graphObj.graph.nodes():
-        clusters.AddNode(node, graphObj.graph)
-
-    for cluster in clusters.cluster_sets:
-        print cluster['cluster_number']
-        for node_info in cluster['node_maps']:
-            print node_info
 
 if __name__ == "__main__":
     main()
